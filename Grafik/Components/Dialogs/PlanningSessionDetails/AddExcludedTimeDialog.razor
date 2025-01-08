@@ -1,0 +1,129 @@
+﻿@using Grafik.Data
+
+@inject DialogService DialogService
+@inject ApplicationDbContext DbContext
+@inject NotificationService NotificationService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+@code {
+    [Parameter]
+    public required PlanningSession PlanningSession { get; set; }
+
+    public ExcludedTime? ExcludedTime { get; set; }
+
+    protected override void OnInitialized()
+    {
+        ExcludedTime = new ExcludedTime
+            {
+                PlanningSessionId = PlanningSession.Id
+            };
+
+        base.OnInitialized();
+    }
+
+    void OnSubmit(ExcludedTime model)
+    {
+        var authState = AuthenticationStateProvider.GetAuthenticationStateAsync().Result;
+
+        if (authState?.User?.Identity?.IsAuthenticated == false)
+        {
+            SendAuthorizationMissingNotification();
+            DialogService.Close(null);
+            return;
+        }
+
+        try
+        {
+            var now = DateTime.Now;
+
+            DbContext.ExcludedTime.Add(model);
+            DbContext.SaveChanges();
+
+            SendSucessNotification();
+        }
+        catch (Exception)
+        {
+            SendErrorNotification();
+        }
+
+        DialogService.Close(model);
+    }
+
+    private void SendErrorNotification()
+    {
+        NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Error,
+                Summary = "Błąd",
+                Detail = "Nie udało się utworzyć wykluczenia"
+            });
+    }
+
+    private void SendSucessNotification()
+    {
+        NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Success,
+                Summary = "Sukces",
+                Detail = "Dodano wykluczenie"
+            });
+    }
+
+    private void SendAuthorizationMissingNotification()
+    {
+        NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Warning,
+                Summary = "Brak autoryzacji",
+                Detail = "Nie jesteś zalogowany. Proszę się zalogować, aby kontynuować."
+            });
+    }
+
+    void OnCancel()
+    {
+        DialogService.Close(null);
+    }
+}
+
+<RadzenTemplateForm TItem="ExcludedTime"
+                    Data="@ExcludedTime"
+                    Submit=@OnSubmit>
+    <RadzenStack Gap="1rem">
+        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Wrap="FlexWrap.Wrap">
+            <RadzenLabel Text="Od"
+                         Style="width: 6rem;" />
+            <RadzenDatePicker @bind-Value="@ExcludedTime.From"
+                              Name="From"
+                              ShowTime="true"
+                              Style="width: 15rem;" />
+            <RadzenRequiredValidator Component="From"
+                                     Text="Data od jest wymagana" />
+        </RadzenStack>
+
+        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Wrap="FlexWrap.Wrap">
+            <RadzenLabel Text="Do"
+                         Style="width: 6rem;" />
+            <RadzenDatePicker @bind-Value="@ExcludedTime.To"
+                              Name="To"
+                              ShowTime="true"
+                              Style="width: 15rem;" />
+            <RadzenRequiredValidator Component="To"
+                                     Text="Data do jest wymagana" />
+        </RadzenStack>
+
+        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Wrap="FlexWrap.Wrap">
+            <RadzenLabel Text="Powód"
+                         Style="width: 6rem;" />
+            <RadzenTextBox Name="Reason"
+                           @bind-Value="@ExcludedTime.Reason"
+                           Style="width: 15rem;" />
+            <RadzenRequiredValidator Component="Reason"
+                                     Text="Powód jest wymagany" />
+        </RadzenStack>
+
+        <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.End">
+            <RadzenButton ButtonType="ButtonType.Submit" Text="Zapisz" ButtonStyle="ButtonStyle.Success" />
+            <RadzenButton ButtonType="ButtonType.Button" Text="Anuluj" Click="OnCancel" />
+        </RadzenStack>
+    </RadzenStack>
+</RadzenTemplateForm>

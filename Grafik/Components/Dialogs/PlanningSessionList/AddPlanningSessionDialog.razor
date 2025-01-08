@@ -1,0 +1,189 @@
+﻿@using Grafik.Data
+
+@inject DialogService DialogService
+@inject ApplicationDbContext DbContext
+@inject NotificationService NotificationService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+@code {
+    private class QuarterlySessionOption
+    {
+        public required string Name { get; set; }
+        public required DateTime From { get; set; }
+        public required DateTime To { get; set; }
+    }
+
+    public PlanningSession planningSession { get; set; } = new();
+    private List<QuarterlySessionOption> quarterlySessionOptions = new();
+
+    protected override void OnInitialized()
+    {
+        var now = DateTime.Now;
+
+        for (int i = 0; i < 5; i++)
+        {
+            var quaterStart = GetFirstDayOfQuarter(now.AddMonths(i * 3));
+            var quaterEnd = quaterStart.AddMonths(3).AddDays(-1);
+            var quaterStartText = quaterStart.ToShortDateString();
+            var quaterEndText = quaterEnd.ToShortDateString();
+
+            quarterlySessionOptions.Add(new QuarterlySessionOption
+                {
+                    Name = $"Kwartał {quaterStartText} - {quaterEndText}",
+                    From = quaterStart,
+                    To = quaterEnd
+                });
+        }
+
+        base.OnInitialized();
+    }
+
+    private DateTime GetFirstDayOfQuarter(DateTime date)
+    {
+        var quarter = (date.Month - 1) / 3 + 1;
+        var year = date.Year + (quarter - 1) / 4;
+        var month = ((quarter - 1) * 3 + 1);
+        return new DateTime(year, month, 1);
+    }
+
+    void OnSubmit(PlanningSession model)
+    {
+        var authState = AuthenticationStateProvider.GetAuthenticationStateAsync().Result;
+
+        if (authState?.User?.Identity?.IsAuthenticated == false)
+        {
+            SendAuthorizationMissingNotification();
+            DialogService.Close(null);
+            return;
+        }
+
+        try
+        {
+            DbContext.PlanningSessions.Add(model);
+            DbContext.SaveChanges();
+            SendSucessNotification();
+        }
+        catch (Exception)
+        {
+            SendErrorNotification();
+        }
+
+        DialogService.Close(model);
+    }
+
+    void OnQuaterSessionButtonClicked(QuarterlySessionOption o)
+    {
+        var authState = AuthenticationStateProvider.GetAuthenticationStateAsync().Result;
+
+        if (authState?.User?.Identity?.IsAuthenticated == false)
+        {
+            SendAuthorizationMissingNotification();
+            DialogService.Close(null);
+            return;
+        }
+
+        planningSession.Comment = o.Name;
+        planningSession.From = o.From;
+        planningSession.To = o.To;
+
+        try
+        {
+            DbContext.PlanningSessions.Add(planningSession);
+            DbContext.SaveChanges();
+            SendSucessNotification();
+        }
+        catch (Exception)
+        {
+            SendErrorNotification();
+        }
+
+        DialogService.Close(planningSession);
+    }
+
+    private void SendErrorNotification(){
+        NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Error,
+                Summary = "Błąd",
+                Detail = "Nie udało się dodać sesji planowania"
+            });
+    }
+
+    private void SendSucessNotification(){
+        NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Success,
+                Summary = "Sukces",
+                Detail = "Dodano sesję planowania"
+            });
+    }
+
+    private void SendAuthorizationMissingNotification()
+    {
+        NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Warning,
+                Summary = "Brak autoryzacji",
+                Detail = "Nie jesteś zalogowany. Proszę się zalogować, aby kontynuować."
+            });
+    }
+
+    void OnCancel()
+    {
+        DialogService.Close(null);
+    }
+}
+
+<RadzenTemplateForm TItem="PlanningSession" Data="@planningSession" Submit=@OnSubmit>
+    <RadzenTabs TabPosition="TabPosition.Top" RenderMode="TabRenderMode.Client">
+        <Tabs>
+            <RadzenTabsItem Text="Opcje kwartalne">
+                <RadzenStack Gap="1rem">
+                    @foreach (var option in quarterlySessionOptions)
+                    {
+                        <RadzenButton 
+                            ButtonStyle="ButtonStyle.Secondary" 
+                            Text=@option.Name
+                            ButtonType="ButtonType.Button"
+                            Click="(args) => OnQuaterSessionButtonClicked(option)" />
+                    }
+                </RadzenStack>
+            </RadzenTabsItem>
+            <RadzenTabsItem Text="Niestandardowa sesja">
+                <RadzenStack Gap="1rem">
+                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Wrap="FlexWrap.Wrap">
+                        <RadzenLabel Text="Od"
+                                     Style="width: 6rem;" />
+                        <RadzenDatePicker @bind-Value=@planningSession.From
+                                          Name="Od"
+                                          ShowCalendarWeek />
+                        <RadzenRequiredValidator Component="Od" Text="Nazwa jest wymagana" />
+                    </RadzenStack>
+
+                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Wrap="FlexWrap.Wrap">
+                        <RadzenLabel Text="Do"
+                                     Style="width: 6rem;" />
+                        <RadzenDatePicker @bind-Value=@planningSession.To
+                                          Name="Do"
+                                          ShowCalendarWeek />
+                        <RadzenRequiredValidator Component="Do" Text="Nazwa jest wymagana" />
+                    </RadzenStack>
+
+                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Wrap="FlexWrap.Wrap">
+                        <RadzenLabel Text="Komentarz"
+                                     Style="width: 6rem;" />
+                        <RadzenTextBox Name="Comment"
+                                       @bind-Value="@planningSession.Comment"
+                                       ShowTime="true"
+                                       Style="width: 12rem;" />
+                    </RadzenStack>
+
+                    <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.End">
+                        <RadzenButton ButtonType="ButtonType.Submit" Text="Zapisz" ButtonStyle="ButtonStyle.Success" />
+                        <RadzenButton ButtonType="ButtonType.Button" Text="Anuluj" Click="OnCancel" />
+                    </RadzenStack>
+                </RadzenStack>
+            </RadzenTabsItem>
+        </Tabs>
+    </RadzenTabs>
+</RadzenTemplateForm>

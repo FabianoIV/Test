@@ -1,0 +1,110 @@
+﻿@page "/planner-users-list"
+
+@using Grafik.Components.Dialogs.PlannerUserList
+@using Grafik.Data
+
+@inject DialogService DialogService
+@inject ApplicationDbContext DbContext
+@inject NotificationService NotificationService
+
+@rendermode InteractiveServer
+
+@code {
+    RadzenDataGrid<PlannerUser>? dataGrid;
+
+    IQueryable<PlannerUser>? users;
+    IList<PlannerUser>? selectedUsers;
+
+    protected override async Task OnInitializedAsync()
+    {
+        users = DbContext.PlannerUsers.AsQueryable();
+
+        await base.OnInitializedAsync();
+    }
+
+    private void OpenAddDialog()
+    {
+        DialogService.OnClose += OnDialogClose;
+        DialogService.Open<AddPlannerUserDialog>("Utwórz użytkownika");
+    }
+
+    private void OpenEditDialog(PlannerUser plannerUser)
+    {
+        DialogService.OnClose += OnDialogClose;
+        DialogService.Open<EditPlannerUserDialog>(
+            "Edytuj użytkownika",
+            new Dictionary<string, object>{
+                { "PlannerUser", plannerUser }
+            });
+    }
+
+    private void OpenDeleteDialog(PlannerUser plannerUser)
+    {
+        DialogService.OnClose += OnDialogClose;
+        DialogService.Open<DeletePlannerUserDialog>(
+            "Usuń użytkownika",
+            new Dictionary<string, object>{
+                { "PlannerUser", plannerUser }
+            });
+    }
+
+    private void OnDialogClose(dynamic args)
+    {
+        dataGrid!.Reload();
+        StateHasChanged();
+        DialogService.OnClose -= (args) => { };
+    }
+}
+
+
+<h3>List osób w planerze</h3>
+
+<RadzenButton Click=@(args => OpenAddDialog())
+              Text="Utwórz"
+              Icon="add_circle"
+              Style="margin-bottom: 1rem; margin-top: 1 rem;"
+              ButtonStyle="ButtonStyle.Primary" />
+
+<RadzenDataGrid
+    AllowFiltering="true"
+    AllowColumnResize="true"
+    AllowAlternatingRows="false"
+    FilterMode="FilterMode.Advanced"
+    AllowSorting="true"
+    PageSize="5"
+    AllowPaging="true"
+    PagerHorizontalAlign="HorizontalAlign.Left"
+    ShowPagingSummary="true"
+    Data="@users"
+    ColumnWidth="300px"
+    LogicalFilterOperator="LogicalFilterOperator.Or"
+    SelectionMode="DataGridSelectionMode.Single"
+    @ref=@dataGrid
+    @bind-Value=@selectedUsers>
+    <Columns>
+        <RadzenDataGridColumn Property="@nameof(PlannerUser.Created)" Filterable="true" Title="Utworzono" Frozen="true" Width="80px" TextAlign="TextAlign.Left" />
+        <RadzenDataGridColumn Property="@nameof(PlannerUser.Updated)" Filterable="true" Title="Edytowano" Frozen="true" Width="80px" TextAlign="TextAlign.Left" />
+        <RadzenDataGridColumn Property="@nameof(PlannerUser.Name)" Filterable="true" Title="Nazwa" Frozen="true" Width="80px" TextAlign="TextAlign.Left" />
+        <RadzenDataGridColumn Property="@nameof(PlannerUser.Email)" Filterable="true" Title="Email" Frozen="true" Width="80px" TextAlign="TextAlign.Left" />
+        <RadzenDataGridColumn Context="plannerUser" Filterable="false" Sortable="false" TextAlign="TextAlign.Right" Width="52px">
+            <Template Context="plannerUser">
+                <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.End">
+                    <RadzenButton Icon="edit"
+                                  ButtonStyle="ButtonStyle.Light"
+                                  Variant="Variant.Flat"
+                                  Size="ButtonSize.Medium"
+                                  Click="@(args => OpenEditDialog(plannerUser))"
+                                  @onclick:stopPropagation="true">
+                    </RadzenButton>
+                    <RadzenButton Icon="delete"
+                                  ButtonStyle="ButtonStyle.Light"
+                                  Variant="Variant.Flat"
+                                  Size="ButtonSize.Medium"
+                                  Click="@(args => OpenDeleteDialog(plannerUser))"
+                                  @onclick:stopPropagation="true">
+                    </RadzenButton>
+                </RadzenStack>
+            </Template>
+        </RadzenDataGridColumn>
+    </Columns>
+</RadzenDataGrid>

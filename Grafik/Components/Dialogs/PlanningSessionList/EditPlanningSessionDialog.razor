@@ -1,0 +1,98 @@
+﻿@using Grafik.Data
+
+@inject DialogService DialogService
+@inject ApplicationDbContext DbContext
+@inject NotificationService NotificationService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+@code {
+    [Parameter]
+    public PlanningSession? PlanningSession { get; set; }
+
+    void OnSubmit(PlanningSession model)
+    {
+        var authState = AuthenticationStateProvider.GetAuthenticationStateAsync().Result;
+
+        if (authState?.User?.Identity?.IsAuthenticated == false)
+        {
+            SendAuthorizationMissingNotification();
+            DialogService.Close(null);
+            return;
+        }
+
+        try
+        {
+            DbContext.PlanningSessions.Update(model);
+            DbContext.SaveChanges();
+
+            NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Success,
+                    Summary = "Sukces",
+                    Detail = "Zaktualizowano sesję planowania"
+                });
+        }
+        catch (Exception)
+        {
+            NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Error,
+                    Summary = "Błąd",
+                    Detail = "Nie udało się zaktualizować sesji planowania"
+                });
+        }
+
+        DialogService.Close(model);
+    }
+
+    void OnCancel()
+    {
+        DialogService.Close(null);
+    }
+
+    private void SendAuthorizationMissingNotification()
+    {
+        NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Warning,
+                Summary = "Brak autoryzacji",
+                Detail = "Nie jesteś zalogowany. Proszę się zalogować, aby kontynuować."
+            });
+    }
+}
+
+<RadzenTemplateForm TItem="PlanningSession" Data="@PlanningSession" Submit=@OnSubmit>
+    <RadzenStack Gap="1rem">
+        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Wrap="FlexWrap.Wrap">
+            <RadzenLabel Text="Od"
+                         Style="width: 6rem;" />
+            <RadzenDatePicker @bind-Value=@PlanningSession.From
+                              Name="Od"
+                              ShowCalendarWeek />
+            <RadzenRequiredValidator Component="Od" Text="Nazwa jest wymagana" />
+        </RadzenStack>
+
+        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Wrap="FlexWrap.Wrap">
+            <RadzenLabel Text="Do"
+                         Style="width: 6rem;" />
+            <RadzenDatePicker @bind-Value=@PlanningSession.To
+                              Name="Do"
+                              ShowCalendarWeek />
+            <RadzenRequiredValidator Component="Do" Text="Nazwa jest wymagana" />
+        </RadzenStack>
+
+        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Wrap="FlexWrap.Wrap">
+            <RadzenLabel Text="Komentarz"
+                         Style="width: 6rem;" />
+            <RadzenTextBox Name="Comment"
+                           @bind-Value="@PlanningSession.Comment"
+                           ShowTime="true"
+                           Style="width: 12rem;" />
+        </RadzenStack>
+
+        <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.End">
+            <RadzenButton ButtonType="ButtonType.Submit" ButtonStyle="ButtonStyle.Success" Text="Edytuj" />
+            <RadzenButton ButtonType="ButtonType.Button" Text="Anuluj" Click="OnCancel" />
+        </RadzenStack>
+    </RadzenStack>
+</RadzenTemplateForm>

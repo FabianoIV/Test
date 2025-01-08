@@ -1,0 +1,208 @@
+﻿@using Grafik.Data
+
+@inject DialogService DialogService
+@inject ApplicationDbContext DbContext
+@inject NotificationService NotificationService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+@code {
+    [Parameter]
+    public required PlanningSession PlanningSession { get; set; }
+
+    [Parameter]
+    public DateTime? PrefferedStartTime { get; set; }
+
+    [Parameter]
+    public DateTime? PrefferedEndTime { get; set; }
+
+    private Reservation reservation;
+
+    private IEnumerable<ReservationType> reservationTypes;
+    private IEnumerable<PlannerUser> plannerUsers;
+
+    protected override void OnInitialized()
+    {
+        reservation = new Reservation { 
+            PlanningSessionId = PlanningSession.Id,
+        };
+
+        if (PrefferedStartTime != null)
+        {
+            reservation.From = PrefferedStartTime.Value;
+        }
+
+        if (PrefferedEndTime != null)
+        {
+            reservation.To = PrefferedEndTime.Value;
+        }
+
+        reservationTypes = new List<ReservationType>() {
+            ReservationType.SchooolReunion,
+            ReservationType.UnavailabilityFree,
+            ReservationType.UnavailabilityPaid
+        };
+
+        plannerUsers = DbContext.PlannerUsers.ToList();
+
+        base.OnInitialized();
+    }
+
+    void OnSubmit(Reservation model)
+    {
+        var authState = AuthenticationStateProvider.GetAuthenticationStateAsync().Result;
+
+        if (authState?.User?.Identity?.IsAuthenticated == false)
+        {
+            SendAuthorizationMissingNotification();
+            DialogService.Close(null);
+            return;
+        }
+
+        try
+        {
+            DbContext.Add(reservation);
+            DbContext.SaveChanges();
+
+            NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Success,
+                    Summary = "Sukces",
+                    Detail = "Dodano rezerwację"
+                });
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Error,
+                    Summary = "Błąd",
+                    Detail = $"Wystąpił błąd: {ex.Message}"
+                });
+        }
+
+
+        DialogService.Close(model);
+    }
+
+    void OnCancel()
+    {
+        DialogService.Close(null);
+    }
+
+    private void SendAuthorizationMissingNotification()
+    {
+        NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Warning,
+                Summary = "Brak autoryzacji",
+                Detail = "Nie jesteś zalogowany. Proszę się zalogować, aby kontynuować."
+            });
+    }
+
+    private bool ValidateFromAndToDateRangeOrder()
+    {
+        if (reservation.From <= reservation.To)
+        {
+            return true;
+        }
+
+        return false;
+    }
+
+    private bool ValidateFromDateAndPlanningSessionFromDateOrder()
+    {
+        if (PlanningSession.From <= reservation.From)
+        {
+            return true;
+        }
+
+        return false;
+    }
+
+    private bool ValidateToDateAndPlanningSessionToDateOrder()
+    {
+        if (PlanningSession.To >= reservation.To)
+        {
+            return true;
+        }
+
+        return false;
+    }
+}
+
+<RadzenTemplateForm TItem="Reservation"
+                    Data="@reservation"
+                    Submit=@OnSubmit>
+    <RadzenStack Gap="1rem">
+        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Wrap="FlexWrap.Wrap">
+            <RadzenLabel Text="Od"
+                         Style="width: 6rem;" />
+            <RadzenDatePicker @bind-Value="@reservation.From"
+                              Name="From"
+                              ShowTime="true"
+                              Style="width: 15rem;" />
+            <RadzenRequiredValidator Component="From"
+                                     Text="Data od jest wymagana" />
+            <RadzenCustomValidator Component="From"
+                                   Validator="@ValidateFromDateAndPlanningSessionFromDateOrder"
+                                   Text="Data 'Od' musi być późniejsza niż data rozpoczęcia sesji planowania" />
+        </RadzenStack>
+
+        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Wrap="FlexWrap.Wrap">
+            <RadzenLabel Text="Do"
+                         Style="width: 6rem;" />
+            <RadzenDatePicker @bind-Value="@reservation.To"
+                              Name="To"
+                              ShowTime="true"
+                              Style="width: 15rem;" />
+            <RadzenRequiredValidator Component="To"
+                                     Text="Data do jest wymagana" />
+            <RadzenCustomValidator Component="To"
+                                   Validator="@ValidateFromAndToDateRangeOrder"
+                                   Text="Data 'Do' musi być później niż data 'Od'" />
+            <RadzenCustomValidator Component="To"
+                                   Validator="@ValidateToDateAndPlanningSessionToDateOrder"
+                                   Text="Data 'Do' musi być wcześniejsza niż data zakończenia sesji planowania" />
+        </RadzenStack>
+
+        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Wrap="FlexWrap.Wrap">
+            <RadzenLabel Text="Typ rezerwacji"
+                         Style="width: 6rem;" />
+            <RadzenDropDown @bind-Value=@reservation.Type
+                            Data=@reservationTypes
+                            Style="width: 15rem;"
+                            Name="DropDownBindValue" />
+        </RadzenStack>
+
+        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Wrap="FlexWrap.Wrap">
+            <RadzenLabel Text="Przypisana osoba"
+                         Style="width: 6rem;" />
+            <RadzenDropDown @bind-Value=@reservation.PlannerUser
+                            Data=@plannerUsers
+                            Style="width: 15rem;"
+                            Name="DropDownPlannerUser">
+                            <Template Context="user">
+                                <div style="display: inline-block; align-items: center;">
+                                    <span style="font-weight: 500; margin-left: 5px;">@user.Name</span>
+                                    <span>(@user.Email)</span>
+                                </div>
+                            </Template>
+                        </RadzenDropDown>
+            <RadzenRequiredValidator Component="DropDownPlannerUser"
+                                     Text="Przypisana osoba jest wymagana" />
+        </RadzenStack>
+
+        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Wrap="FlexWrap.Wrap">
+            <RadzenLabel Text="Komentarz"
+                         Style="width: 6rem;" />
+            <RadzenTextBox Name="Comment"
+                           @bind-Value="@reservation.Comment"
+                           Style="width: 15rem;" />
+        </RadzenStack>
+
+        <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.End">
+            <RadzenButton ButtonType="ButtonType.Submit" Text="Zapisz" ButtonStyle="ButtonStyle.Success" />
+            <RadzenButton ButtonType="ButtonType.Button" Text="Anuluj" Click="OnCancel" />
+        </RadzenStack>
+    </RadzenStack>
+</RadzenTemplateForm>

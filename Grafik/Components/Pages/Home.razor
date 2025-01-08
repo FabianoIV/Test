@@ -1,0 +1,23 @@
+﻿@page "/"
+@using Grafik.Components.Dialogs
+@using Grafik.Components.Shared
+@using Grafik.Data
+@rendermode InteractiveServer
+
+@inject DialogService DialogService
+
+@code{
+    DateTime PlannerSessionStartDate = new DateTime(2024, 09, 01);
+    DateTime PlannerSessionEndDate = new DateTime(2025, 01, 01);
+
+    EventConsole console;
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        base.OnAfterRender(firstRender);
+    }
+}
+
+<PageTitle>Grafik</PageTitle>
+
+<EventConsole @ref=@console />

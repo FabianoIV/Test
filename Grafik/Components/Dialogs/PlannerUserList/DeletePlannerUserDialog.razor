@@ -1,0 +1,76 @@
+﻿@using Grafik.Data
+
+@inject DialogService DialogService
+@inject ApplicationDbContext DbContext
+@inject NotificationService NotificationService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+@code {
+    [Parameter]
+    public required PlannerUser PlannerUser { get; set; }
+
+    void OnSubmit(PlannerUser model)
+    {
+        var authState = AuthenticationStateProvider.GetAuthenticationStateAsync().Result;
+
+        if (authState?.User?.Identity?.IsAuthenticated == false)
+        {
+            SendAuthorizationMissingNotification();
+            DialogService.Close(null);
+            return;
+        }
+
+        try
+        {
+            DbContext.PlannerUsers.Remove(model);
+            DbContext.SaveChanges();
+
+            NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Success,
+                    Summary = "Sukces",
+                    Detail = "Usunięto użytkownika"
+                });
+        }
+        catch (Exception)
+        {
+            NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Error,
+                    Summary = "Błąd",
+                    Detail = "Nie udało się usunąć użytkownika"
+                });
+        }
+
+        DialogService.Close(model);
+    }
+
+    void OnCancel()
+    {
+        DialogService.Close(null);
+    }
+
+    private void SendAuthorizationMissingNotification()
+    {
+        NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Warning,
+                Summary = "Brak autoryzacji",
+                Detail = "Nie jesteś zalogowany. Proszę się zalogować, aby kontynuować."
+            });
+    }
+}
+
+<RadzenTemplateForm TItem="PlannerUser" Data="@PlannerUser" Submit=@OnSubmit>
+    <RadzenStack Gap="1rem">
+        Czy na pewno chcesz usunąć użytkownika?
+        <br />
+        @PlannerUser.Name <br />
+        @PlannerUser.Email <br />
+
+        <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.End">
+            <RadzenButton ButtonType="ButtonType.Submit" ButtonStyle="ButtonStyle.Danger" Text="Usuń" />
+            <RadzenButton ButtonType="ButtonType.Button" Text="Anuluj" Click="OnCancel" />
+        </RadzenStack>
+    </RadzenStack>
+</RadzenTemplateForm>

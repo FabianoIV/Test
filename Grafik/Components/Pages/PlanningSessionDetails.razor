@@ -1,0 +1,389 @@
+﻿@page "/planning-sessions/{planningSessionId:guid}"
+
+@using Grafik.Components.Dialogs
+@using Grafik.Components.Shared
+@using Grafik.Data
+@using Grafik.Helpers
+@using Microsoft.EntityFrameworkCore
+@using Grafik.Components.Dialogs.PlanningSessionDetails
+
+@rendermode InteractiveServer
+
+@inject DialogService DialogService
+@inject ApplicationDbContext DbContext
+@inject NotificationService NotificationService
+
+@code {
+    [Parameter]
+    public Guid PlanningSessionId { get; set; }
+
+    public PlanningSession PlanningSession { get; set; }
+
+    RadzenScheduler<Reservation>? scheduler;
+    RadzenDataGrid<Reservation>? reservationDataGrid;
+    RadzenDataGrid<ExcludedTime>? excludedTimeDataGrid;
+
+    IQueryable<Reservation>? reservations;
+    IList<Reservation>? selectedReservations;
+
+    IQueryable<ExcludedTime>? excludedTimes;
+    IList<ExcludedTime>? selectedExcludedTimes;
+
+    List<ExcludedTime> excludedTimesCached = new List<ExcludedTime>();
+
+    protected override Task OnInitializedAsync()
+    {
+        PlanningSession = DbContext.PlanningSessions.Single(x => x.Id == PlanningSessionId);
+        reservations = DbContext.Reservations.Include("PlannerUser").Where(r => r.PlanningSessionId == PlanningSessionId).AsQueryable();
+        excludedTimes = DbContext.ExcludedTime.Where(r => r.PlanningSessionId == PlanningSessionId).AsQueryable();
+
+        excludedTimesCached = excludedTimes.ToList();
+
+        return base.OnInitializedAsync();
+    }
+
+    private void OpenAddReservationDialog(DateTime? prefferedStartTime = null, DateTime? prefferedEndTime = null)
+    {
+        DialogService.OnClose += OnDialogClose;
+        DialogService.Open<AddReservationDialog>(
+            "Dodaj rezerwację",
+            new Dictionary<string, object> {
+                    { "PlanningSession", PlanningSession },
+                    { "PrefferedStartTime", prefferedStartTime!},
+                    { "PrefferedEndTime", prefferedEndTime!},
+                });
+    }
+
+    private void OpenExcludedTimeDialog()
+    {
+        DialogService.OnClose += OnDialogClose;
+        DialogService.Open<AddExcludedTimeDialog>(
+            "Dodaj wykluczenie",
+            new Dictionary<string, object> {
+                    { "PlanningSession", PlanningSession }
+            });
+    }
+
+    private void OpenEditDialog(Reservation reservation)
+    {
+        DialogService.OnClose += OnDialogClose;
+        DialogService.Open<EditReservationDialog>(
+            "Edytuj sesję planowania",
+            new Dictionary<string, object>{
+                { "Reservation", reservation }
+                    });
+    }
+
+    private void OpenEditDialog(ExcludedTime excludedTime)
+    {
+        // DialogService.OnClose += OnDialogClose;
+        // DialogService.Open<EditExcludedTimeDialog>(
+        //     "Edytuj wykluczenie",
+        //     new Dictionary<string, object>{
+        //         { "ExcludedTime", excludedTime }
+        //             });
+    }
+
+    private void OpenDeleteDialog(Reservation reservation)
+    {
+        DialogService.OnClose += OnDialogClose;
+        DialogService.Open<DeleteReservationDialog>(
+            "Usuń rezerwację",
+            new Dictionary<string, object>{
+                { "Reservation", reservation }
+                    });
+    }
+
+    private void OpenDeleteDialog(ExcludedTime excludedTime)
+    {
+        // DialogService.OnClose += OnDialogClose;
+        // DialogService.Open<DeleteExcludedTimeDialog>(
+        //     "Usuń wykluczenie",
+        //     new Dictionary<string, object>{
+        //         { "ExcludedTime", excludedTime }
+        //             });
+    }
+
+    private void OnDialogClose(dynamic args)
+    {
+        excludedTimesCached = excludedTimes!.ToList();
+
+        scheduler!.Reload();
+        reservationDataGrid!.Reload();
+        excludedTimeDataGrid!.Reload();
+
+        DialogService.OnClose -= (args) => { };
+    }
+
+    private void OnSlotRender(SchedulerSlotRenderEventArgs args)
+    {
+        if (PlanningSession == null)
+        {
+            return;
+        }
+
+        if (args.Start < PlanningSession.From || args.Start > PlanningSession.To)
+        {
+            // Set background grey if slot is outside of PlanningSession range
+            args.Attributes["class"] = "rz-slot-out-of-range";
+        }
+        else
+        {
+            // Applay only to cells with 1 day range
+            if (!((args.End - args.Start).Days > 1))
+            {
+                foreach (var item in excludedTimesCached)
+                {
+                    // Check if args.Start is beetween item.From and item.To
+                    if (args.Start >= item.From && args.Start <= item.To)
+                    {
+                        // set background red
+                        args.Attributes["class"] = "rz-slot-excluded";
+                    }
+                }
+            }
+        }
+    }
+
+    async Task OnSlotSelect(SchedulerSlotSelectEventArgs args)
+    {
+        if (args.Start >= PlanningSession.From && args.Start <= PlanningSession.To)
+        {
+            OpenAddReservationDialog(args.Start, args.End);
+        }
+    }
+
+    async Task OnAppointmentSelect(SchedulerAppointmentSelectEventArgs<Reservation> args)
+    {
+        OpenEditDialog(args.Data);
+    }
+
+    void OnAppointmentRender(SchedulerAppointmentRenderEventArgs<Reservation> args)
+    {
+        var color = ColorHelper.GenerateColorFromString(args.Data.PlannerUser.Email);
+        args.Attributes["style"] = $"background: {color}";
+    }
+
+    async Task OnAppointmentMove(SchedulerAppointmentMoveEventArgs args)
+    {
+        
+    }
+}
+
+<PageTitle>Grafik</PageTitle>
+
+<h3>Sesja planingowa: @PlanningSession.From.ToShortDateString() - @PlanningSession.To.ToShortDateString() (@PlanningSession.Comment) </h3>
+
+<RadzenTabs TabPosition="TabPosition.Top" RenderMode="TabRenderMode.Client">
+    <Tabs>
+        <RadzenTabsItem Text="Lista">
+            <RadzenButton Click=@(args => OpenAddReservationDialog())
+                          Text="Dodaj Rezerwację"
+                          Icon="add_circle"
+                          Style="margin-bottom: 15px"
+                          ButtonStyle="ButtonStyle.Primary" />
+
+            <RadzenDataGrid AllowFiltering="true"
+                            AllowColumnResize="false"
+                            AllowAlternatingRows="false"
+                            FilterMode="FilterMode.Advanced"
+                            AllowSorting="true"
+                            PageSize="25"
+                            AllowPaging="true"
+                            PagerHorizontalAlign="HorizontalAlign.Justify"
+                            ShowPagingSummary="true"
+                            Data="@reservations"
+                            ColumnWidth="300px"
+                            LogicalFilterOperator="LogicalFilterOperator.Or"
+                            SelectionMode="DataGridSelectionMode.Single"
+                            @bind-Value=@selectedReservations
+                            @ref=@reservationDataGrid>
+                <Columns>
+                    <RadzenDataGridColumn Property="@nameof(Reservation.From)"
+                                          FormatString="{0:d}"
+                                          Filterable="true"
+                                          Title="Od"
+                                          Frozen="true"
+                                          Width="80px"
+                                          TextAlign="TextAlign.Left" />
+                    <RadzenDataGridColumn Property="@nameof(Reservation.To)"
+                                          FormatString="{0:d}"
+                                          Filterable="true"
+                                          Title="Do"
+                                          Frozen="true"
+                                          Width="80px"
+                                          TextAlign="TextAlign.Left" />
+                    <RadzenDataGridColumn TItem="Reservation"
+                                          Property="@nameof(Reservation.PlannerUser)"
+                                          Filterable="true"
+                                          Title="Przypisana Osoba"
+                                          Frozen="true"
+                                          Width="200px"
+                                          TextAlign="TextAlign.Left">
+                        <Template Context="reservation">
+                            @if (reservation.PlannerUser != null)
+                            {
+                                    <div style="display: flex; align-items: center;">
+                                        <span>@reservation.PlannerUser.Name</span>&nbsp;
+                                        <span>(@reservation.PlannerUser.Email)</span>
+                                    </div>
+                            }
+                            else
+                            {
+                                    <span>Nie przypisano</span>
+                            }
+                        </Template>
+                    </RadzenDataGridColumn>
+                    <RadzenDataGridColumn Property="@nameof(Reservation.Type)"
+                                          Filterable="true"
+                                          Title="Typ"
+                                          Frozen="true"
+                                          Width="80px"
+                                          TextAlign="TextAlign.Left" />
+                    <RadzenDataGridColumn Property="@nameof(Reservation.Comment)"
+                                          Filterable="true"
+                                          Title="Komentarz"
+                                          Frozen="true"
+                                          Width="80px"
+                                          TextAlign="TextAlign.Left" />
+                    <RadzenDataGridColumn Context="reservation"
+                                          Filterable="false"
+                                          Sortable="false"
+                                          TextAlign="TextAlign.Right"
+                                          Width="52px">
+                        <Template Context="reservation">
+                            <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.End">
+                                <RadzenButton Icon="edit"
+                                              ButtonStyle="ButtonStyle.Light"
+                                              Variant="Variant.Flat"
+                                              Size="ButtonSize.Medium"
+                                              Click="@(args => OpenEditDialog(reservation))"
+                                              @onclick:stopPropagation="true">
+                                </RadzenButton>
+                                <RadzenButton Icon="delete"
+                                              ButtonStyle="ButtonStyle.Light"
+                                              Variant="Variant.Flat"
+                                              Size="ButtonSize.Medium"
+                                              Click="@(args => OpenDeleteDialog(reservation))"
+                                              @onclick:stopPropagation="true">
+                                </RadzenButton>
+                            </RadzenStack>
+                        </Template>
+                    </RadzenDataGridColumn>
+                </Columns>
+            </RadzenDataGrid>
+        </RadzenTabsItem>
+        <RadzenTabsItem Text="Kalendarz">
+            <RadzenButton Click=@(args => OpenAddReservationDialog())
+                          Text="Dodaj Rezerwację"
+                          Icon="add_circle"
+                          Style="margin-bottom: 15px"
+                          ButtonStyle="ButtonStyle.Primary" />
+
+            <RadzenScheduler @ref=@scheduler
+                             SlotRender=@OnSlotRender
+                             style="height: 880px;"
+                             TItem="Reservation"
+                             Data=@reservations
+                             StartProperty="From"
+                             EndProperty="To"
+                             TextProperty="CalendarDescription"
+                             SelectedIndex="3"
+                             SlotSelect=@OnSlotSelect
+                             AppointmentSelect=@OnAppointmentSelect
+                             AppointmentRender=@OnAppointmentRender
+                             AppointmentMove=@OnAppointmentMove>
+                <RadzenDayView Text="Dzień" />
+                <RadzenWeekView Text="Tydzień" />
+                <RadzenMonthView Text="Miesiąc" />
+                <RadzenYearPlannerView 
+                    MaxAppointmentsInSlot="5" 
+                    Text="Rok" />
+            </RadzenScheduler>
+        </RadzenTabsItem>
+        <RadzenTabsItem Text="Dni wyłączone">
+            <RadzenButton Click=@(args => OpenExcludedTimeDialog())
+                          Text="Dodaj Regułę"
+                          Icon="add_circle"
+                          Style="margin-bottom: 15px"
+                          ButtonStyle="ButtonStyle.Primary" />
+
+            <RadzenDataGrid AllowFiltering="false"
+                            AllowColumnResize="false"
+                            AllowAlternatingRows="false"
+                            FilterMode="FilterMode.Advanced"
+                            AllowSorting="true"
+                            PageSize="25"
+                            AllowPaging="true"
+                            PagerHorizontalAlign="HorizontalAlign.Justify"
+                            ShowPagingSummary="true"
+                            Data="@excludedTimes"
+                            ColumnWidth="300px"
+                            LogicalFilterOperator="LogicalFilterOperator.Or"
+                            SelectionMode="DataGridSelectionMode.Single"
+                            @bind-Value=@selectedExcludedTimes
+                            @ref=@excludedTimeDataGrid>
+                <Columns>
+                    <RadzenDataGridColumn Property="@nameof(ExcludedTime.From)"
+                                          FormatString="{0:d}"
+                                          Filterable="true"
+                                          Title="Od"
+                                          Frozen="true"
+                                          Width="80px"
+                                          TextAlign="TextAlign.Left" />
+                    <RadzenDataGridColumn Property="@nameof(ExcludedTime.To)"
+                                           FormatString="{0:d}"
+                                           Filterable="true"
+                                           Title="Do"
+                                           Frozen="true"
+                                           Width="80px"
+                                           TextAlign="TextAlign.Left" />
+                    <RadzenDataGridColumn Property="@nameof(ExcludedTime.Reason)"
+                                          Filterable="true"
+                                          Title="Powód"
+                                          Frozen="true"
+                                          Width="80px"
+                                          TextAlign="TextAlign.Left" />
+                    <RadzenDataGridColumn Context="excludedTime"
+                                          Filterable="false"
+                                          Sortable="false"
+                                          TextAlign="TextAlign.Right"
+                                          Width="52px">
+                        <Template Context="excludedTime">
+                            <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.End">
+                                <RadzenButton Icon="edit"
+                                              ButtonStyle="ButtonStyle.Light"
+                                              Variant="Variant.Flat"
+                                              Size="ButtonSize.Medium"
+                                              Click="@(args => OpenEditDialog(excludedTime))"
+                                              @onclick:stopPropagation="true">
+                                </RadzenButton>
+                                <RadzenButton Icon="delete"
+                                              ButtonStyle="ButtonStyle.Light"
+                                              Variant="Variant.Flat"
+                                              Size="ButtonSize.Medium"
+                                              Click="@(args => OpenDeleteDialog(excludedTime))"
+                                              @onclick:stopPropagation="true">
+                                </RadzenButton>
+                            </RadzenStack>
+                        </Template>
+                    </RadzenDataGridColumn>
+                </Columns>
+            </RadzenDataGrid>
+        </RadzenTabsItem>
+    </Tabs>
+</RadzenTabs>
+
+<style>
+    .rz-slot-excluded:not(:has(.rz-slot-header)) {
+        background: #ffcccb !important; /* Background for .master without .child */
+    }
+
+    .rz-slot-out-of-range {
+        background: #f5f5f5 !important;
+    }
+
+    .input-wrap! > input[type=text] {
+        background: #000;
+    }
+</style>

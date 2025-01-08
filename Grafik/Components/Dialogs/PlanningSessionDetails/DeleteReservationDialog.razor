@@ -1,0 +1,77 @@
+﻿@using Grafik.Data
+
+@inject DialogService DialogService
+@inject ApplicationDbContext DbContext
+@inject NotificationService NotificationService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+@code {
+    [Parameter]
+    public required Reservation Reservation { get; set; }
+
+    void OnSubmit(Reservation model)
+    {
+        var authState = AuthenticationStateProvider.GetAuthenticationStateAsync().Result;
+
+        if (authState?.User?.Identity?.IsAuthenticated == false)
+        {
+            SendAuthorizationMissingNotification();
+            DialogService.Close(null);
+            return;
+        }
+
+        try
+        {
+            DbContext.Reservations.Remove(Reservation);
+            DbContext.SaveChanges();
+
+            NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Success,
+                    Summary = "Sukces",
+                    Detail = "Usunięto rezerwację"
+                });
+        }
+        catch (Exception)
+        {
+            NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Error,
+                    Summary = "Błąd",
+                    Detail = "Nie udało się usunąć rezerwacji"
+                });
+        }
+
+        DialogService.Close(model);
+    }
+
+    void OnCancel()
+    {
+        DialogService.Close(null);
+    }
+
+    private void SendAuthorizationMissingNotification()
+    {
+        NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Warning,
+                Summary = "Brak autoryzacji",
+                Detail = "Nie jesteś zalogowany. Proszę się zalogować, aby kontynuować."
+            });
+    }
+}
+
+
+<RadzenTemplateForm TItem="Reservation" Data="@Reservation" Submit=@OnSubmit>
+    <RadzenStack Gap="1rem">
+        Czy na pewno chcesz usunąć rezerwację?
+        <br />
+        @Reservation.From - @Reservation.To <br/>
+        @Reservation.Comment <br />
+
+        <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.End">
+            <RadzenButton ButtonType="ButtonType.Submit" ButtonStyle="ButtonStyle.Danger" Text="Usuń" />
+            <RadzenButton ButtonType="ButtonType.Button" Text="Anuluj" Click="OnCancel" />
+        </RadzenStack>
+    </RadzenStack>
+</RadzenTemplateForm>

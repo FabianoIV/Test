@@ -1,0 +1,141 @@
+﻿@using Grafik.Data
+
+@inject DialogService DialogService
+@inject ApplicationDbContext DbContext
+@inject NotificationService NotificationService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+@code {
+    [Parameter]
+    public Reservation? Reservation { get; set; }
+
+    private IEnumerable<ReservationType> reservationTypes;
+    private IEnumerable<PlannerUser> plannerUsers;
+
+    protected override void OnInitialized()
+    {
+        reservationTypes = new List<ReservationType>() {
+            ReservationType.SchooolReunion,
+            ReservationType.UnavailabilityFree,
+            ReservationType.UnavailabilityPaid
+        };
+
+        plannerUsers = DbContext.PlannerUsers.ToList();
+
+        base.OnInitialized();
+    }
+
+    void OnSubmit(Reservation model)
+    {
+        var authState = AuthenticationStateProvider.GetAuthenticationStateAsync().Result;
+
+        if (authState?.User?.Identity?.IsAuthenticated == false)
+        {
+            SendAuthorizationMissingNotification();
+            DialogService.Close(null);
+            return;
+        }
+
+        try
+        {
+            DbContext.Reservations.Update(model);
+            DbContext.SaveChanges();
+
+            NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Success,
+                    Summary = "Sukces",
+                    Detail = "Zaktualizowano rezerwację"
+                });
+        }
+        catch (Exception)
+        {
+            NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Error,
+                    Summary = "Błąd",
+                    Detail = "Nie udało się zaktualizować rezerwacji"
+                });
+        }
+
+        DialogService.Close(model);
+    }
+
+    void OnCancel()
+    {
+        DialogService.Close(null);
+    }
+
+    private void SendAuthorizationMissingNotification()
+    {
+        NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Warning,
+                Summary = "Brak autoryzacji",
+                Detail = "Nie jesteś zalogowany. Proszę się zalogować, aby kontynuować."
+            });
+    }
+}
+
+<RadzenTemplateForm TItem="Reservation" Data="@Reservation" Submit=@OnSubmit>
+    <RadzenStack Gap="1rem">
+
+        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Wrap="FlexWrap.Wrap">
+            <RadzenLabel Text="Od"
+                         Style="width: 6rem;" />
+            <RadzenDatePicker @bind-Value=@Reservation.From
+                              Name="Od"
+                              ShowCalendarWeek />
+            <RadzenRequiredValidator Component="Od" Text="Data od jest wymagana" />
+        </RadzenStack>
+
+        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Wrap="FlexWrap.Wrap">
+            <RadzenLabel Text="Do"
+                         Style="width: 6rem;" />
+            <RadzenDatePicker @bind-Value=@Reservation.To
+                              Name="Do"
+                              ShowCalendarWeek />
+            <RadzenRequiredValidator Component="Do" Text="Data do jest wymagana" />
+        </RadzenStack>
+
+        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Wrap="FlexWrap.Wrap">
+            <RadzenLabel Text="Typ rezerwacji"
+                         Style="width: 6rem;" />
+            <RadzenDropDown @bind-Value=@Reservation.Type
+                            Data=@reservationTypes
+                            Style="width: 15rem;"
+                            Name="DropDownBindValue" />
+        </RadzenStack>
+
+        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Wrap="FlexWrap.Wrap">
+            <RadzenLabel Text="Przypisana osoba"
+                         Style="width: 6rem;" />
+            <RadzenDropDown @bind-Value=@Reservation.PlannerUser
+                            Data=@plannerUsers
+                            Style="width: 15rem;"
+                            Name="DropDownPlannerUser">
+                <Template Context="user">
+                    <div style="display: inline-block; align-items: center;">
+                        <span style="font-weight: 500; margin-left: 5px;">@user.Name</span>
+                        <span>(@user.Email)</span>
+                    </div>
+                </Template>
+            </RadzenDropDown>
+            <RadzenRequiredValidator Component="DropDownPlannerUser"
+                                     Text="Przypisana osoba jest wymagana" />
+        </RadzenStack>
+
+        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Wrap="FlexWrap.Wrap">
+            <RadzenLabel Text="Nazwa"
+                         Style="width: 6rem;" />
+            <RadzenTextBox Name="Name"
+                           @bind-Value="@Reservation.Comment"
+                           Style="width: 12rem;" />
+        </RadzenStack>
+
+        <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.End">
+            <RadzenButton ButtonType="ButtonType.Submit" ButtonStyle="ButtonStyle.Success" Text="Edytuj" />
+            <RadzenButton ButtonType="ButtonType.Button" Text="Anuluj" Click="OnCancel" />
+        </RadzenStack>
+    </RadzenStack>
+</RadzenTemplateForm>

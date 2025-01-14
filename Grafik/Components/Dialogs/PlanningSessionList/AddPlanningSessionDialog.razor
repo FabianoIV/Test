@@ -1,9 +1,11 @@
 ﻿@using Grafik.Data
+@using Grafik.Services
 
 @inject DialogService DialogService
 @inject ApplicationDbContext DbContext
 @inject NotificationService NotificationService
 @inject AuthenticationStateProvider AuthenticationStateProvider
+@inject ICustomNotificationsService CustomNotificationsService
 
 @code {
     private class QuarterlySessionOption
@@ -52,7 +54,7 @@
 
         if (authState?.User?.Identity?.IsAuthenticated == false)
         {
-            SendAuthorizationMissingNotification();
+            CustomNotificationsService.SendAuthorizationMissingNotification();
             DialogService.Close(null);
             return;
         }
@@ -61,11 +63,11 @@
         {
             DbContext.PlanningSessions.Add(model);
             DbContext.SaveChanges();
-            SendSucessNotification();
+            CustomNotificationsService.SendPlanningSessionCreateSucessNotification();
         }
         catch (Exception)
         {
-            SendErrorNotification();
+            CustomNotificationsService.SendPlanningSessionCreateErrorNotification();
         }
 
         DialogService.Close(model);
@@ -77,7 +79,7 @@
 
         if (authState?.User?.Identity?.IsAuthenticated == false)
         {
-            SendAuthorizationMissingNotification();
+            CustomNotificationsService.SendAuthorizationMissingNotification();
             DialogService.Close(null);
             return;
         }
@@ -85,47 +87,20 @@
         planningSession.Comment = o.Name;
         planningSession.From = o.From;
         planningSession.To = o.To;
+        planningSession.IsActive = true;
 
         try
         {
             DbContext.PlanningSessions.Add(planningSession);
             DbContext.SaveChanges();
-            SendSucessNotification();
+            CustomNotificationsService.SendPlanningSessionCreateSucessNotification();
         }
         catch (Exception)
         {
-            SendErrorNotification();
+            CustomNotificationsService.SendPlanningSessionCreateErrorNotification();
         }
 
         DialogService.Close(planningSession);
-    }
-
-    private void SendErrorNotification(){
-        NotificationService.Notify(new NotificationMessage
-            {
-                Severity = NotificationSeverity.Error,
-                Summary = "Błąd",
-                Detail = "Nie udało się dodać sesji planowania"
-            });
-    }
-
-    private void SendSucessNotification(){
-        NotificationService.Notify(new NotificationMessage
-            {
-                Severity = NotificationSeverity.Success,
-                Summary = "Sukces",
-                Detail = "Dodano sesję planowania"
-            });
-    }
-
-    private void SendAuthorizationMissingNotification()
-    {
-        NotificationService.Notify(new NotificationMessage
-            {
-                Severity = NotificationSeverity.Warning,
-                Summary = "Brak autoryzacji",
-                Detail = "Nie jesteś zalogowany. Proszę się zalogować, aby kontynuować."
-            });
     }
 
     void OnCancel()

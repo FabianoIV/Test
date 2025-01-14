@@ -4,14 +4,18 @@
 @using Grafik.Components.Shared
 @using Grafik.Data
 @using Grafik.Helpers
+@using Grafik.Services
 @using Microsoft.EntityFrameworkCore
 @using Grafik.Components.Dialogs.PlanningSessionDetails
+@using System.Globalization
 
 @rendermode InteractiveServer
 
 @inject DialogService DialogService
 @inject ApplicationDbContext DbContext
 @inject NotificationService NotificationService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject ICustomNotificationsService CustomNotificationsService
 
 @code {
     [Parameter]
@@ -33,6 +37,9 @@
 
     protected override Task OnInitializedAsync()
     {
+        CultureInfo.DefaultThreadCurrentCulture = new CultureInfo("pl-PL");
+        CultureInfo.DefaultThreadCurrentUICulture = new CultureInfo("pl-PL");
+
         PlanningSession = DbContext.PlanningSessions.Single(x => x.Id == PlanningSessionId);
         reservations = DbContext.Reservations.Include("PlannerUser").Where(r => r.PlanningSessionId == PlanningSessionId).AsQueryable();
         excludedTimes = DbContext.ExcludedTime.Where(r => r.PlanningSessionId == PlanningSessionId).AsQueryable();
@@ -44,6 +51,20 @@
 
     private void OpenAddReservationDialog(DateTime? prefferedStartTime = null, DateTime? prefferedEndTime = null)
     {
+        var authState = AuthenticationStateProvider.GetAuthenticationStateAsync().Result;
+
+        if (authState.User != null && !authState.User!.Identity!.IsAuthenticated)
+        {
+            CustomNotificationsService.SendAuthorizationMissingNotification();
+            return;
+        }
+
+        if (!PlanningSession.IsActive)
+        {
+            CustomNotificationsService.SendSessionNotActiveNotification();
+            return;
+        }
+
         DialogService.OnClose += OnDialogClose;
         DialogService.Open<AddReservationDialog>(
             "Dodaj rezerwację",
@@ -56,6 +77,26 @@
 
     private void OpenExcludedTimeDialog()
     {
+        var authState = AuthenticationStateProvider.GetAuthenticationStateAsync().Result;
+
+        if (authState.User != null && !authState.User!.Identity!.IsAuthenticated)
+        {
+            CustomNotificationsService.SendAuthorizationMissingNotification();
+            return;
+        }
+
+        if (!authState.User!.IsInRole("Administrator"))
+        {
+            CustomNotificationsService.SendAdministratorRoleMissingNotification();
+            return;
+        }
+
+        if (!PlanningSession.IsActive)
+        {
+            CustomNotificationsService.SendSessionNotActiveNotification();
+            return;
+        }
+
         DialogService.OnClose += OnDialogClose;
         DialogService.Open<AddExcludedTimeDialog>(
             "Dodaj wykluczenie",
@@ -66,6 +107,20 @@
 
     private void OpenEditDialog(Reservation reservation)
     {
+        var authState = AuthenticationStateProvider.GetAuthenticationStateAsync().Result;
+
+        if (authState.User != null && !authState.User!.Identity!.IsAuthenticated)
+        {
+            CustomNotificationsService.SendAuthorizationMissingNotification();
+            return;
+        }
+
+        if (!PlanningSession.IsActive)
+        {
+            CustomNotificationsService.SendSessionNotActiveNotification();
+            return;
+        }
+
         DialogService.OnClose += OnDialogClose;
         DialogService.Open<EditReservationDialog>(
             "Edytuj sesję planowania",
@@ -76,16 +131,50 @@
 
     private void OpenEditDialog(ExcludedTime excludedTime)
     {
-        // DialogService.OnClose += OnDialogClose;
-        // DialogService.Open<EditExcludedTimeDialog>(
-        //     "Edytuj wykluczenie",
-        //     new Dictionary<string, object>{
-        //         { "ExcludedTime", excludedTime }
-        //             });
+        var authState = AuthenticationStateProvider.GetAuthenticationStateAsync().Result;
+
+        if (!authState.User!.Identity!.IsAuthenticated)
+        {
+            CustomNotificationsService.SendAuthorizationMissingNotification();
+            return;
+        }
+
+        if (!authState.User!.IsInRole("Administrator"))
+        {
+            CustomNotificationsService.SendAdministratorRoleMissingNotification();
+            return;
+        }
+
+        if (!PlanningSession.IsActive)
+        {
+            CustomNotificationsService.SendSessionNotActiveNotification();
+            return;
+        }
+
+        DialogService.OnClose += OnDialogClose;
+        DialogService.Open<EditExcludedTimeDialog>(
+            "Edytuj wykluczenie",
+            new Dictionary<string, object>{
+                { "ExcludedTime", excludedTime }
+            });
     }
 
     private void OpenDeleteDialog(Reservation reservation)
     {
+        var authState = AuthenticationStateProvider.GetAuthenticationStateAsync().Result;
+
+        if (authState.User != null && !authState.User!.Identity!.IsAuthenticated)
+        {
+            CustomNotificationsService.SendAuthorizationMissingNotification();
+            return;
+        }
+
+        if (!PlanningSession.IsActive)
+        {
+            CustomNotificationsService.SendSessionNotActiveNotification();
+            return;
+        }
+
         DialogService.OnClose += OnDialogClose;
         DialogService.Open<DeleteReservationDialog>(
             "Usuń rezerwację",
@@ -96,12 +185,32 @@
 
     private void OpenDeleteDialog(ExcludedTime excludedTime)
     {
-        // DialogService.OnClose += OnDialogClose;
-        // DialogService.Open<DeleteExcludedTimeDialog>(
-        //     "Usuń wykluczenie",
-        //     new Dictionary<string, object>{
-        //         { "ExcludedTime", excludedTime }
-        //             });
+        var authState = AuthenticationStateProvider.GetAuthenticationStateAsync().Result;
+
+        if (!authState.User!.Identity!.IsAuthenticated)
+        {
+            CustomNotificationsService.SendAuthorizationMissingNotification();
+            return;
+        }
+
+        if (!authState.User!.IsInRole("Administrator"))
+        {
+            CustomNotificationsService.SendAdministratorRoleMissingNotification();
+            return;
+        }
+
+        if (!PlanningSession.IsActive)
+        {
+            CustomNotificationsService.SendSessionNotActiveNotification();
+            return;
+        }
+
+        DialogService.OnClose += OnDialogClose;
+        DialogService.Open<DeleteExcludedTimeDialog>(
+            "Usuń wykluczenie",
+            new Dictionary<string, object>{
+                { "ExcludedTime", excludedTime }
+            });
     }
 
     private void OnDialogClose(dynamic args)
@@ -174,9 +283,49 @@
 
 <h3>Sesja planingowa: @PlanningSession.From.ToShortDateString() - @PlanningSession.To.ToShortDateString() (@PlanningSession.Comment) </h3>
 
+@if(!PlanningSession.IsActive)
+{
+    <h4>Sesja nieaktywna</h4>
+    <p>W tej sesji nie można dodawać rezerwacji.</p>
+}
+else 
+{
+    <h4>Sesja aktywna</h4>
+    <p>W tej sesji można dodawać rezerwacje.</p>
+}
+
 <RadzenTabs TabPosition="TabPosition.Top" RenderMode="TabRenderMode.Client">
     <Tabs>
-        <RadzenTabsItem Text="Lista">
+        
+        <RadzenTabsItem Text="Kalendarz">
+            <RadzenButton Click=@(args => OpenAddReservationDialog())
+                          Text="Dodaj Rezerwację"
+                          Icon="add_circle"
+                          Style="margin-bottom: 15px"
+                          ButtonStyle="ButtonStyle.Primary" />
+
+            <RadzenScheduler @ref=@scheduler
+                             SlotRender=@OnSlotRender
+                             style="height: 880px;"
+                             TItem="Reservation"
+                             Data=@reservations
+                             StartProperty="From"
+                             EndProperty="To"
+                             TextProperty="CalendarDescription"
+                             SelectedIndex="3"
+                             SlotSelect=@OnSlotSelect
+                             AppointmentSelect=@OnAppointmentSelect
+                             AppointmentRender=@OnAppointmentRender
+                             AppointmentMove=@OnAppointmentMove>
+                <RadzenDayView Text="Dzień" StartTime=@TimeSpan.Zero EndTime=@TimeSpan.FromDays(1) TimeFormat="HH:mm" />
+                <RadzenWeekView Text="Tydzień" StartTime=@TimeSpan.Zero EndTime=@TimeSpan.FromDays(1) TimeFormat="HH:mm" />
+                <RadzenMonthView Text="Miesiąc" />
+                <RadzenYearPlannerView 
+                    MaxAppointmentsInSlot="5" 
+                    Text="Rok" />
+            </RadzenScheduler>
+        </RadzenTabsItem>
+        <RadzenTabsItem Text="Lista Rezerwacji">
             <RadzenButton Click=@(args => OpenAddReservationDialog())
                           Text="Dodaj Rezerwację"
                           Icon="add_circle"
@@ -223,14 +372,14 @@
                         <Template Context="reservation">
                             @if (reservation.PlannerUser != null)
                             {
-                                    <div style="display: flex; align-items: center;">
-                                        <span>@reservation.PlannerUser.Name</span>&nbsp;
-                                        <span>(@reservation.PlannerUser.Email)</span>
-                                    </div>
+                                <div style="display: flex; align-items: center;">
+                                    <span>@reservation.PlannerUser.Name</span>&nbsp;
+                                    <span>(@reservation.PlannerUser.Email)</span>
+                                </div>
                             }
                             else
                             {
-                                    <span>Nie przypisano</span>
+                                <span>Nie przypisano</span>
                             }
                         </Template>
                     </RadzenDataGridColumn>
@@ -272,34 +421,6 @@
                     </RadzenDataGridColumn>
                 </Columns>
             </RadzenDataGrid>
-        </RadzenTabsItem>
-        <RadzenTabsItem Text="Kalendarz">
-            <RadzenButton Click=@(args => OpenAddReservationDialog())
-                          Text="Dodaj Rezerwację"
-                          Icon="add_circle"
-                          Style="margin-bottom: 15px"
-                          ButtonStyle="ButtonStyle.Primary" />
-
-            <RadzenScheduler @ref=@scheduler
-                             SlotRender=@OnSlotRender
-                             style="height: 880px;"
-                             TItem="Reservation"
-                             Data=@reservations
-                             StartProperty="From"
-                             EndProperty="To"
-                             TextProperty="CalendarDescription"
-                             SelectedIndex="3"
-                             SlotSelect=@OnSlotSelect
-                             AppointmentSelect=@OnAppointmentSelect
-                             AppointmentRender=@OnAppointmentRender
-                             AppointmentMove=@OnAppointmentMove>
-                <RadzenDayView Text="Dzień" />
-                <RadzenWeekView Text="Tydzień" />
-                <RadzenMonthView Text="Miesiąc" />
-                <RadzenYearPlannerView 
-                    MaxAppointmentsInSlot="5" 
-                    Text="Rok" />
-            </RadzenScheduler>
         </RadzenTabsItem>
         <RadzenTabsItem Text="Dni wyłączone">
             <RadzenButton Click=@(args => OpenExcludedTimeDialog())
@@ -371,6 +492,10 @@
                 </Columns>
             </RadzenDataGrid>
         </RadzenTabsItem>
+        <RadzenTabsItem Text="Limity Dni">
+
+        </RadzenTabsItem>
+
     </Tabs>
 </RadzenTabs>
 

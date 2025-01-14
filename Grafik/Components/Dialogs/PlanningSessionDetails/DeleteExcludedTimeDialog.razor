@@ -1,19 +1,17 @@
 ﻿@using Grafik.Data
 @using Grafik.Services
-@using Microsoft.AspNetCore.Identity
 
 @inject DialogService DialogService
 @inject ApplicationDbContext DbContext
 @inject NotificationService NotificationService
 @inject AuthenticationStateProvider AuthenticationStateProvider
-@inject UserManager<ApplicationUser> UserManager
 @inject ICustomNotificationsService CustomNotificationsService
 
 @code {
     [Parameter]
-    public required PlannerUser PlannerUser { get; set; }
+    public required ExcludedTime ExcludedTime { get; set; }
 
-    async Task OnSubmit(PlannerUser model)
+    void OnSubmit(ExcludedTime model)
     {
         var authState = AuthenticationStateProvider.GetAuthenticationStateAsync().Result;
 
@@ -26,25 +24,14 @@
 
         try
         {
-            DbContext.PlannerUsers.Remove(model);
+            DbContext.ExcludedTime.Remove(model);
             DbContext.SaveChanges();
 
-            var user = await UserManager.FindByEmailAsync(model.Email);
-            if (user != null)
-            {
-                var result = await UserManager.DeleteAsync(user);
-                if (!result.Succeeded)
-                {
-                    CustomNotificationsService.SendUserRemoveErrorNotification();
-                    return;
-                }
-            }
-
-            CustomNotificationsService.SendUserRemoveSuccessNotification();
+            CustomNotificationsService.SendExcludedTimeDeleteSuccessNotification();
         }
         catch (Exception)
         {
-            CustomNotificationsService.SendUserRemoveErrorNotification();
+            CustomNotificationsService.SendExcludedTimeDeleteErrorNotification();
         }
 
         DialogService.Close(model);
@@ -56,12 +43,11 @@
     }
 }
 
-<RadzenTemplateForm TItem="PlannerUser" Data="@PlannerUser" Submit=@OnSubmit>
+<RadzenTemplateForm TItem="ExcludedTime" Data="@ExcludedTime" Submit=@OnSubmit>
     <RadzenStack Gap="1rem">
-        Czy na pewno chcesz usunąć użytkownika?
-        <br />
-        @PlannerUser.Name <br />
-        @PlannerUser.Email <br />
+        Czy na pewno chcesz usunąć wykluczone godziny? <br />
+        @ExcludedTime.From - @ExcludedTime.To <br />
+        @ExcludedTime.Reason <br />
 
         <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.End">
             <RadzenButton ButtonType="ButtonType.Submit" ButtonStyle="ButtonStyle.Danger" Text="Usuń" />

@@ -4,6 +4,7 @@
 @using Grafik.Components.Dialogs.PlanningSessionList
 @using Grafik.Data
 @using Microsoft.EntityFrameworkCore
+@using Grafik.Services
 
 @rendermode InteractiveServer
 
@@ -11,6 +12,8 @@
 @inject NotificationService NotificationService
 @inject ApplicationDbContext DbContext
 @inject NavigationManager NavigationManager
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject ICustomNotificationsService CustomNotificationsService
 
 @code {
     RadzenDataGrid<PlanningSession>? dataGrid;
@@ -26,12 +29,40 @@
 
     private void OpenAddDialog()
     {
+        var authState = AuthenticationStateProvider.GetAuthenticationStateAsync().Result;
+        
+        if (!authState.User!.Identity!.IsAuthenticated)
+        {
+            CustomNotificationsService.SendAuthorizationMissingNotification();
+            return;
+        }
+        
+        if (!authState.User!.IsInRole("Administrator"))
+        {
+            CustomNotificationsService.SendAdministratorRoleMissingNotification();
+            return;
+        }
+
         DialogService.OnClose += OnDialogClose;
         DialogService.Open<AddPlanningSessionDialog>("Utwórz sesję planowania");
     }
 
     private void OpenDeleteDialog(PlanningSession planningSession)
     {
+        var authState = AuthenticationStateProvider.GetAuthenticationStateAsync().Result;
+        
+        if (!authState.User!.Identity!.IsAuthenticated)
+        {
+            CustomNotificationsService.SendAuthorizationMissingNotification();
+            return;
+        }
+        
+        if (!authState.User!.IsInRole("Administrator"))
+        {
+            CustomNotificationsService.SendAdministratorRoleMissingNotification();
+            return;
+        }
+
         DialogService.OnClose += OnDialogClose;
         DialogService.Open<DeletePlanningSessionDialog>(
             "Usuń sesję planowania",
@@ -42,6 +73,20 @@
 
     private void OpenEditDialog(PlanningSession planningSession)
     {
+        var authState = AuthenticationStateProvider.GetAuthenticationStateAsync().Result;
+        
+        if (!authState.User!.Identity!.IsAuthenticated)
+        {
+            CustomNotificationsService.SendAuthorizationMissingNotification();
+            return;
+        }
+        
+        if (!authState.User!.IsInRole("Administrator"))
+        {
+            CustomNotificationsService.SendAdministratorRoleMissingNotification();
+            return;
+        }
+
         DialogService.OnClose += OnDialogClose;
         DialogService.Open<EditPlanningSessionDialog>(
             "Edytuj sesję planowania", 
@@ -59,14 +104,15 @@
         dataGrid!.Reload();
         DialogService.OnClose -= (args) => { };
     }
-
-    private void OnClick(string text)
-    {
-        NotificationService.Notify(new NotificationMessage { Severity = NotificationSeverity.Info, Summary = "Button Clicked", Detail = text });
-    }
 }
 
 <h3>Sesje Planingowe</h3>
+
+<RadzenButton Click=@(args => OpenAddDialog())
+              Text="Utwórz"
+              Icon="add_circle"
+              Style="margin-bottom: 1rem; margin-top: 1 rem;"
+              ButtonStyle="ButtonStyle.Primary" />
 
 <RadzenDataGrid AllowFiltering="true"
                 AllowColumnResize="false"
@@ -84,9 +130,19 @@
                 @bind-Value=@selectedPlanningSessions
                 @ref="dataGrid">
     <Columns>
-        <RadzenDataGridColumn Property="@nameof(PlanningSession.From)" FormatString="{0:d}" Filterable="true" Title="Od" Frozen="true" Width="80px" TextAlign="TextAlign.Left" />
-        <RadzenDataGridColumn Property="@nameof(PlanningSession.To)" FormatString="{0:d}" Filterable="true" Title="Do" Frozen="true" Width="80px" TextAlign="TextAlign.Left" />
-        <RadzenDataGridColumn Property="@nameof(PlanningSession.Comment)" Filterable="true" Title="Komentarz" Frozen="true" Width="80px" TextAlign="TextAlign.Left" />
+        <RadzenDataGridColumn Property="@nameof(PlanningSession.From)" FormatString="{0:d}" Filterable="false" Title="Od" Frozen="true" Width="80px" TextAlign="TextAlign.Left" />
+        <RadzenDataGridColumn Property="@nameof(PlanningSession.To)" FormatString="{0:d}" Filterable="false" Title="Do" Frozen="true" Width="80px" TextAlign="TextAlign.Left" />
+        <RadzenDataGridColumn Property="@nameof(PlanningSession.Comment)" Filterable="true" Title="Komentarz" Frozen="false" Width="180px" TextAlign="TextAlign.Left" />
+        <RadzenDataGridColumn Property="@nameof(PlanningSession.IsActive)"
+                              Filterable="true"
+                              Title="Czy sesja aktywna?"
+                              Frozen="true"
+                              Width="80px"
+                              TextAlign="TextAlign.Left">
+            <Template Context="data">
+                @((data.IsActive ? "Tak" : "Nie"))
+            </Template>
+        </RadzenDataGridColumn>
         <RadzenDataGridColumn Context="planningSession" Filterable="false" Sortable="false" TextAlign="TextAlign.Right" Width="52px">
             <Template Context="planningSession">
                 <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.End">
@@ -116,10 +172,3 @@
         </RadzenDataGridColumn>
     </Columns>
 </RadzenDataGrid>
-
-<br />
-
-<RadzenButton Click=@(args => OpenAddDialog())
-              Text="Utwórz"
-              Icon="add_circle"
-              ButtonStyle="ButtonStyle.Primary" />

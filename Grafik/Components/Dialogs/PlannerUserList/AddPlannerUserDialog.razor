@@ -1,9 +1,13 @@
 ﻿@using Grafik.Data
+@using Grafik.Services
+@using Microsoft.AspNetCore.Identity
 
 @inject DialogService DialogService
 @inject ApplicationDbContext DbContext
 @inject NotificationService NotificationService
 @inject AuthenticationStateProvider AuthenticationStateProvider
+@inject UserManager<ApplicationUser> UserManager
+@inject ICustomNotificationsService CustomNotificationsService
 
 @code {
     public PlannerUser PlannerUser { get; set; } = new PlannerUser()
@@ -11,14 +15,15 @@
         Name = "",
         Email = ""
     };
+    public string Password { get; set; }
 
-    void OnSubmit(PlannerUser model)
+    async Task OnSubmit(PlannerUser model)
     {
         var authState = AuthenticationStateProvider.GetAuthenticationStateAsync().Result;
 
         if (authState?.User?.Identity?.IsAuthenticated == false)
         {
-            SendAuthorizationMissingNotification();
+            CustomNotificationsService.SendAuthorizationMissingNotification();
             DialogService.Close(null);
             return;
         }
@@ -32,44 +37,30 @@
             DbContext.PlannerUsers.Add(model);
             DbContext.SaveChanges();
 
-            SendSucessNotification();
+            // Create user
+            var user = new ApplicationUser
+            {
+                UserName = model.Email,
+                Email = model.Email,
+                EmailConfirmed = true
+            };
+
+            var result = await UserManager.CreateAsync(user, Password);
+
+            if (!result.Succeeded)
+            {
+                CustomNotificationsService.SendUserCreatedErrorNotification();
+                return;
+            }
+
+            CustomNotificationsService.SendUserCreatedSucessNotification();
         }
         catch (Exception)
         {
-            SendErrorNotification();
+            CustomNotificationsService.SendUserCreatedErrorNotification();
         }
 
         DialogService.Close(model);
-    }
-
-    private void SendErrorNotification()
-    {
-        NotificationService.Notify(new NotificationMessage
-            {
-                Severity = NotificationSeverity.Error,
-                Summary = "Błąd",
-                Detail = "Nie udało się dodać użytkownika"
-            });
-    }
-
-    private void SendSucessNotification()
-    {
-        NotificationService.Notify(new NotificationMessage
-            {
-                Severity = NotificationSeverity.Success,
-                Summary = "Sukces",
-                Detail = "Dodano użytkownika"
-            });
-    }
-
-    private void SendAuthorizationMissingNotification()
-    {
-        NotificationService.Notify(new NotificationMessage
-            {
-                Severity = NotificationSeverity.Warning,
-                Summary = "Brak autoryzacji",
-                Detail = "Nie jesteś zalogowany. Proszę się zalogować, aby kontynuować."
-            });
     }
 
     void OnCancel()
@@ -100,6 +91,19 @@
                            Style="width: 15rem;" />
             <RadzenRequiredValidator Component="Email" Text="Email jest wymagany" />
             <RadzenEmailValidator Component="Email" Text="Nipoprawny adres email" />
+        </RadzenStack>
+
+        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Wrap="FlexWrap.Wrap">
+            <RadzenLabel Text="Hasło"
+                         Style="width: 6rem;" />
+            <RadzenTextBox Name="Password"
+                           @bind-Value="Password"
+                           Style="width: 15rem;" />
+            <RadzenRequiredValidator Component="Password" Text="Hasło jest wymagane" />
+            <RadzenCustomValidator Text="Hasło musi zawierać co najmniej jedną dużą literę" Component="Password" IsValid="@(() => Password.Any(char.IsUpper))" />
+            <RadzenCustomValidator Text="Hasło musi zawierać co najmniej jedną małą literę" Component="Password" IsValid="@(() => Password.Any(char.IsLower))" />
+            <RadzenCustomValidator Text="Hasło musi zawierać co najmniej jedną cyfrę" Component="Password" IsValid="@(() => Password.Any(char.IsDigit))" />
+            <RadzenCustomValidator Text="Hasło musi zawierać co najmniej jeden znak specjalny" Component="Password" IsValid="@(() => Password.Any(char.IsPunctuation))" />
         </RadzenStack>
 
         <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.End">

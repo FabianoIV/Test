@@ -1,45 +1,47 @@
 ﻿@using Grafik.Data
+@using Grafik.Services
+@using Microsoft.AspNetCore.Identity
 
 @inject DialogService DialogService
 @inject ApplicationDbContext DbContext
 @inject NotificationService NotificationService
 @inject AuthenticationStateProvider AuthenticationStateProvider
+@inject UserManager<ApplicationUser> UserManager
+@inject ICustomNotificationsService CustomNotificationsService
 
 @code {
     [Parameter]
     public PlannerUser? PlannerUser { get; set; }
 
-    void OnSubmit(PlannerUser model)
+    async Task OnSubmit(PlannerUser model)
     {
         var authState = AuthenticationStateProvider.GetAuthenticationStateAsync().Result;
 
         if (authState?.User?.Identity?.IsAuthenticated == false)
         {
-            SendAuthorizationMissingNotification();
+            CustomNotificationsService.SendAuthorizationMissingNotification();
             DialogService.Close(null);
             return;
         }
 
         try
         {
+            var user = await UserManager.FindByEmailAsync(PlannerUser!.Email);
+            if (user != null)
+            {
+                user.Email = model.Email;
+                user.UserName = model.Email;
+                await UserManager.UpdateAsync(user);
+            }
+
             DbContext.PlannerUsers.Update(model);
             DbContext.SaveChanges();
 
-            NotificationService.Notify(new NotificationMessage
-                {
-                    Severity = NotificationSeverity.Success,
-                    Summary = "Sukces",
-                    Detail = "Zaktualizowano użytkownika"
-                });
+            CustomNotificationsService.SendUserUpdateSuccessNotification();
         }
         catch (Exception)
         {
-            NotificationService.Notify(new NotificationMessage
-                {
-                    Severity = NotificationSeverity.Error,
-                    Summary = "Błąd",
-                    Detail = "Nie udało się zaktualizować użytkownika"
-                });
+            CustomNotificationsService.SendUserUpdateErrorNotification();
         }
 
         DialogService.Close(model);
@@ -48,16 +50,6 @@
     void OnCancel()
     {
         DialogService.Close(null);
-    }
-
-    private void SendAuthorizationMissingNotification()
-    {
-        NotificationService.Notify(new NotificationMessage
-            {
-                Severity = NotificationSeverity.Warning,
-                Summary = "Brak autoryzacji",
-                Detail = "Nie jesteś zalogowany. Proszę się zalogować, aby kontynuować."
-            });
     }
 }
 

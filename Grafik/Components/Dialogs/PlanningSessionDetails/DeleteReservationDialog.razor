@@ -1,13 +1,24 @@
 ﻿@using Grafik.Data
+@using System.Security.Claims
+@using Grafik.Services
 
 @inject DialogService DialogService
 @inject ApplicationDbContext DbContext
 @inject NotificationService NotificationService
 @inject AuthenticationStateProvider AuthenticationStateProvider
+@inject ICustomNotificationsService CustomNotificationsService
 
 @code {
     [Parameter]
     public required Reservation Reservation { get; set; }
+
+    public ClaimsPrincipal User
+    {
+        get
+        {
+            return AuthenticationStateProvider.GetAuthenticationStateAsync().Result.User;
+        }
+    }
 
     void OnSubmit(Reservation model)
     {
@@ -15,9 +26,18 @@
 
         if (authState?.User?.Identity?.IsAuthenticated == false)
         {
-            SendAuthorizationMissingNotification();
+            CustomNotificationsService.SendAuthorizationMissingNotification();
             DialogService.Close(null);
             return;
+        }
+
+        if (!User.IsInRole("Administrator"))
+        {
+            if (model.PlannerUser.Email != authState.User.Identity.Name)
+            {
+                CustomNotificationsService.SendNotReservationOwnerNotification();
+                return;
+            }
         }
 
         try
@@ -25,21 +45,11 @@
             DbContext.Reservations.Remove(Reservation);
             DbContext.SaveChanges();
 
-            NotificationService.Notify(new NotificationMessage
-                {
-                    Severity = NotificationSeverity.Success,
-                    Summary = "Sukces",
-                    Detail = "Usunięto rezerwację"
-                });
+            CustomNotificationsService.SendReservationDeleteSuccessNotification();
         }
         catch (Exception)
         {
-            NotificationService.Notify(new NotificationMessage
-                {
-                    Severity = NotificationSeverity.Error,
-                    Summary = "Błąd",
-                    Detail = "Nie udało się usunąć rezerwacji"
-                });
+            CustomNotificationsService.SendReservationDeleteErrorNotification();
         }
 
         DialogService.Close(model);
@@ -49,18 +59,7 @@
     {
         DialogService.Close(null);
     }
-
-    private void SendAuthorizationMissingNotification()
-    {
-        NotificationService.Notify(new NotificationMessage
-            {
-                Severity = NotificationSeverity.Warning,
-                Summary = "Brak autoryzacji",
-                Detail = "Nie jesteś zalogowany. Proszę się zalogować, aby kontynuować."
-            });
-    }
 }
-
 
 <RadzenTemplateForm TItem="Reservation" Data="@Reservation" Submit=@OnSubmit>
     <RadzenStack Gap="1rem">

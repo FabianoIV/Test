@@ -1,9 +1,11 @@
 ﻿@using Grafik.Data
+@using Grafik.Services
 
 @inject DialogService DialogService
 @inject ApplicationDbContext DbContext
 @inject NotificationService NotificationService
 @inject AuthenticationStateProvider AuthenticationStateProvider
+@inject ICustomNotificationsService CustomNotificationsService
 
 @code {
     [Parameter]
@@ -15,7 +17,7 @@
 
         if (authState?.User?.Identity?.IsAuthenticated == false)
         {
-            SendAuthorizationMissingNotification();
+            CustomNotificationsService.SendAuthorizationMissingNotification();
             DialogService.Close(null);
             return;
         }
@@ -25,21 +27,11 @@
             DbContext.PlanningSessions.Remove(model);
             DbContext.SaveChanges();
 
-            NotificationService.Notify(new NotificationMessage
-                {
-                    Severity = NotificationSeverity.Success,
-                    Summary = "Sukces",
-                    Detail = "Usunięto sesję planowania"
-                });
+            CustomNotificationsService.SendPlanningSessionDeleteSuccessNotification();
         }
         catch (Exception)
         {
-            NotificationService.Notify(new NotificationMessage
-                {
-                    Severity = NotificationSeverity.Error,
-                    Summary = "Błąd",
-                    Detail = "Nie udało się usunąć sesji planowania"
-                });
+            CustomNotificationsService.SendPlanningSessionDeleteErrorNotification();
         }
 
         DialogService.Close(model);
@@ -48,16 +40,6 @@
     void OnCancel()
     {
         DialogService.Close(null);
-    }
-
-    private void SendAuthorizationMissingNotification()
-    {
-        NotificationService.Notify(new NotificationMessage
-            {
-                Severity = NotificationSeverity.Warning,
-                Summary = "Brak autoryzacji",
-                Detail = "Nie jesteś zalogowany. Proszę się zalogować, aby kontynuować."
-            });
     }
 }
 

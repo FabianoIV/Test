@@ -10,4 +10,5 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<Reservation> Reservations { get; set; }
     public DbSet<PlannerUser> PlannerUsers { get; set; }
     public DbSet<ExcludedTime> ExcludedTime { get; set; }
+    public DbSet<UserHourLimit> UserHourLimit { get; set; }
 }

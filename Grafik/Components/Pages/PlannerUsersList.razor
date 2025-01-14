@@ -2,10 +2,17 @@
 
 @using Grafik.Components.Dialogs.PlannerUserList
 @using Grafik.Data
+@using Grafik.Services
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Identity
+
+@attribute [Authorize]
 
 @inject DialogService DialogService
 @inject ApplicationDbContext DbContext
 @inject NotificationService NotificationService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject ICustomNotificationsService CustomNotificationsService
 
 @rendermode InteractiveServer
 
@@ -24,12 +31,40 @@
 
     private void OpenAddDialog()
     {
+        var authState = AuthenticationStateProvider.GetAuthenticationStateAsync().Result;
+
+        if (authState.User != null && !authState.User!.Identity.IsAuthenticated)
+        {
+            CustomNotificationsService.SendAuthorizationMissingNotification();
+            return;
+        }
+
+        if (!authState.User!.IsInRole("Administrator"))
+        {
+            CustomNotificationsService.SendAuthorizationMissingNotification();
+            return;
+        }
+
         DialogService.OnClose += OnDialogClose;
         DialogService.Open<AddPlannerUserDialog>("Utwórz użytkownika");
     }
 
     private void OpenEditDialog(PlannerUser plannerUser)
     {
+        var authState = AuthenticationStateProvider.GetAuthenticationStateAsync().Result;
+
+        if (authState.User != null && !authState.User!.Identity.IsAuthenticated)
+        {
+            CustomNotificationsService.SendAuthorizationMissingNotification();
+            return;
+        }
+
+        if (!authState.User!.IsInRole("Administrator"))
+        {
+            CustomNotificationsService.SendAuthorizationMissingNotification();
+            return;
+        }
+
         DialogService.OnClose += OnDialogClose;
         DialogService.Open<EditPlannerUserDialog>(
             "Edytuj użytkownika",
@@ -40,6 +75,20 @@
 
     private void OpenDeleteDialog(PlannerUser plannerUser)
     {
+        var authState = AuthenticationStateProvider.GetAuthenticationStateAsync().Result;
+
+        if (authState.User != null && !authState.User!.Identity.IsAuthenticated)
+        {
+            CustomNotificationsService.SendAuthorizationMissingNotification();
+            return;
+        }
+
+        if (!authState.User!.IsInRole("Administrator"))
+        {
+            CustomNotificationsService.SendAuthorizationMissingNotification();
+            return;
+        }
+
         DialogService.OnClose += OnDialogClose;
         DialogService.Open<DeletePlannerUserDialog>(
             "Usuń użytkownika",
@@ -55,7 +104,6 @@
         DialogService.OnClose -= (args) => { };
     }
 }
-
 
 <h3>List osób w planerze</h3>
 

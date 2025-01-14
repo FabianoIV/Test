@@ -1,5 +1,4 @@
-﻿using Grafik.Data;
-using Microsoft.AspNetCore.Identity;
+﻿using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
@@ -12,9 +11,28 @@ namespace Grafik.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            // Hash the password for "admin"
+            var adminId = Guid.NewGuid().ToString();
+            var roleId = Guid.NewGuid().ToString();
             var passwordHash = new PasswordHasher<IdentityUser>().HashPassword(null, "admin");
 
+            // Add "Administrator" role
+            migrationBuilder.Sql($@"
+                INSERT INTO AspNetRoles (
+                    Id,
+                    Name,
+                    NormalizedName,
+                    ConcurrencyStamp
+                )
+                VALUES (
+                    '{roleId}',
+                    'Administrator',
+                    'ADMINISTRATOR',
+                    NEWID()
+                )
+            ");
+
+
+            // Add the admin user
             migrationBuilder.Sql($@"
                 INSERT INTO AspNetUsers (
                     Id,
@@ -32,7 +50,7 @@ namespace Grafik.Migrations
                     AccessFailedCount
                 )
                 VALUES (
-                    NEWID(),
+                    '{adminId}',
                     'admin',
                     'ADMIN',
                     'admin@admin.com',
@@ -47,14 +65,40 @@ namespace Grafik.Migrations
                     0
                 )
             ");
+
+            // Assign the role to the admin user
+            migrationBuilder.Sql($@"
+                INSERT INTO AspNetUserRoles (
+                    UserId,
+                    RoleId
+                )
+                VALUES (
+                    '{adminId}',
+                    '{roleId}'
+                )
+            ");
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.Sql(@"
-                DELETE FROM AspNetUsers 
+            // Remove the admin user
+            migrationBuilder.Sql($@"
+                DELETE FROM AspNetUserRoles
+                WHERE UserId IN (
+                    SELECT Id FROM AspNetUsers WHERE UserName = 'admin'
+                )
+            ");
+
+            migrationBuilder.Sql($@"
+                DELETE FROM AspNetUsers
                 WHERE UserName = 'admin'
+            ");
+
+            // Remove the "Administrator" role
+            migrationBuilder.Sql($@"
+                DELETE FROM AspNetRoles
+                WHERE Name = 'Administrator'
             ");
         }
     }

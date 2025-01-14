@@ -9,17 +9,10 @@
 
 @code {
     [Parameter]
-    public required PlanningSession PlanningSession { get; set; }
-
-    public ExcludedTime? ExcludedTime { get; set; }
+    public ExcludedTime? excludedTime { get; set; }
 
     protected override void OnInitialized()
     {
-        ExcludedTime = new ExcludedTime
-            {
-                PlanningSessionId = PlanningSession.Id
-            };
-
         base.OnInitialized();
     }
 
@@ -36,16 +29,14 @@
 
         try
         {
-            var now = DateTime.Now;
-
-            DbContext.ExcludedTime.Add(model);
+            DbContext.ExcludedTime.Update(model);
             DbContext.SaveChanges();
 
-            CustomNotificationsService.SendExcludedTimeSucessNotification();
+            CustomNotificationsService.SendExcludedTimeUpdateSuccessNotification();
         }
         catch (Exception)
         {
-            CustomNotificationsService.SendExcludedTimeErrorNotification();
+            CustomNotificationsService.SendExcludedTimeUpdateErrorNotification();
         }
 
         DialogService.Close(model);
@@ -57,44 +48,37 @@
     }
 }
 
-<RadzenTemplateForm TItem="ExcludedTime"
-                    Data="@ExcludedTime"
-                    Submit=@OnSubmit>
+<RadzenTemplateForm TItem="ExcludedTime" Data="@excludedTime" Submit=@OnSubmit>
     <RadzenStack Gap="1rem">
+
         <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Wrap="FlexWrap.Wrap">
             <RadzenLabel Text="Od"
                          Style="width: 6rem;" />
-            <RadzenDatePicker @bind-Value="@ExcludedTime.From"
-                              Name="From"
-                              ShowTime="true"
-                              Style="width: 15rem;" />
-            <RadzenRequiredValidator Component="From"
-                                     Text="Data od jest wymagana" />
+            <RadzenDatePicker @bind-Value=@excludedTime!.From
+                              Name="Od"
+                              ShowCalendarWeek />
+            <RadzenRequiredValidator Component="Od" Text="Data od jest wymagana" />
         </RadzenStack>
 
         <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Wrap="FlexWrap.Wrap">
             <RadzenLabel Text="Do"
                          Style="width: 6rem;" />
-            <RadzenDatePicker @bind-Value="@ExcludedTime.To"
-                              Name="To"
-                              ShowTime="true"
-                              Style="width: 15rem;" />
-            <RadzenRequiredValidator Component="To"
-                                     Text="Data do jest wymagana" />
+            <RadzenDatePicker @bind-Value=@excludedTime!.To
+                              Name="Do"
+                              ShowCalendarWeek />
+            <RadzenRequiredValidator Component="Do" Text="Data do jest wymagana" />
         </RadzenStack>
 
         <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Wrap="FlexWrap.Wrap">
             <RadzenLabel Text="Powód"
                          Style="width: 6rem;" />
             <RadzenTextBox Name="Reason"
-                           @bind-Value="@ExcludedTime.Reason"
-                           Style="width: 15rem;" />
-            <RadzenRequiredValidator Component="Reason"
-                                     Text="Powód jest wymagany" />
+                           @bind-Value="@excludedTime!.Reason"
+                           Style="width: 12rem;" />
         </RadzenStack>
 
         <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.End">
-            <RadzenButton ButtonType="ButtonType.Submit" Text="Zapisz" ButtonStyle="ButtonStyle.Success" />
+            <RadzenButton ButtonType="ButtonType.Submit" ButtonStyle="ButtonStyle.Success" Text="Edytuj" />
             <RadzenButton ButtonType="ButtonType.Button" Text="Anuluj" Click="OnCancel" />
         </RadzenStack>
     </RadzenStack>

@@ -5,35 +5,25 @@
 @inject DialogService DialogService
 @inject ApplicationDbContext DbContext
 @inject NotificationService NotificationService
-@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject ICustomAuthService authService
 @inject ICustomNotificationsService CustomNotificationsService
 
 @code {
     [Parameter]
     public required Reservation Reservation { get; set; }
 
-    public ClaimsPrincipal User
+    async Task OnSubmit(Reservation model)
     {
-        get
-        {
-            return AuthenticationStateProvider.GetAuthenticationStateAsync().Result.User;
-        }
-    }
-
-    void OnSubmit(Reservation model)
-    {
-        var authState = AuthenticationStateProvider.GetAuthenticationStateAsync().Result;
-
-        if (authState?.User?.Identity?.IsAuthenticated == false)
+        if (!await authService.IsUserAuthenticated())
         {
             CustomNotificationsService.SendAuthorizationMissingNotification();
             DialogService.Close(null);
             return;
         }
 
-        if (!User.IsInRole("Administrator"))
+        if (!await authService.IsAdministrator())
         {
-            if (model.PlannerUser.Email != authState.User.Identity.Name)
+            if (model.PlannerUser.Email != (await authService.GetLoggedUserName()))
             {
                 CustomNotificationsService.SendNotReservationOwnerNotification();
                 return;
@@ -64,9 +54,6 @@
 <RadzenTemplateForm TItem="Reservation" Data="@Reservation" Submit=@OnSubmit>
     <RadzenStack Gap="1rem">
         Czy na pewno chcesz usunąć rezerwację?
-        <br />
-        @Reservation.From - @Reservation.To <br/>
-        @Reservation.Comment <br />
 
         <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.End">
             <RadzenButton ButtonType="ButtonType.Submit" ButtonStyle="ButtonStyle.Danger" Text="Usuń" />

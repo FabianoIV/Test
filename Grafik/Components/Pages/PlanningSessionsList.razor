@@ -12,7 +12,7 @@
 @inject NotificationService NotificationService
 @inject ApplicationDbContext DbContext
 @inject NavigationManager NavigationManager
-@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject ICustomAuthService authService
 @inject ICustomNotificationsService CustomNotificationsService
 
 @code {
@@ -27,17 +27,15 @@
         await base.OnInitializedAsync();
     }
 
-    private void OpenAddDialog()
+    private async Task OpenAddDialog()
     {
-        var authState = AuthenticationStateProvider.GetAuthenticationStateAsync().Result;
-        
-        if (!authState.User!.Identity!.IsAuthenticated)
+        if (!await authService.IsUserAuthenticated())
         {
             CustomNotificationsService.SendAuthorizationMissingNotification();
             return;
         }
         
-        if (!authState.User!.IsInRole("Administrator"))
+        if (!await authService.IsAdministrator())
         {
             CustomNotificationsService.SendAdministratorRoleMissingNotification();
             return;
@@ -47,17 +45,15 @@
         DialogService.Open<AddPlanningSessionDialog>("Utwórz sesję planowania");
     }
 
-    private void OpenDeleteDialog(PlanningSession planningSession)
+    private async Task OpenDeleteDialog(PlanningSession planningSession)
     {
-        var authState = AuthenticationStateProvider.GetAuthenticationStateAsync().Result;
-        
-        if (!authState.User!.Identity!.IsAuthenticated)
+        if (!await authService.IsUserAuthenticated())
         {
             CustomNotificationsService.SendAuthorizationMissingNotification();
             return;
         }
-        
-        if (!authState.User!.IsInRole("Administrator"))
+
+        if (!await authService.IsAdministrator())
         {
             CustomNotificationsService.SendAdministratorRoleMissingNotification();
             return;
@@ -71,17 +67,15 @@
             });
     }
 
-    private void OpenEditDialog(PlanningSession planningSession)
+    private async Task OpenEditDialog(PlanningSession planningSession)
     {
-        var authState = AuthenticationStateProvider.GetAuthenticationStateAsync().Result;
-        
-        if (!authState.User!.Identity!.IsAuthenticated)
+        if (!await authService.IsUserAuthenticated())
         {
             CustomNotificationsService.SendAuthorizationMissingNotification();
             return;
         }
-        
-        if (!authState.User!.IsInRole("Administrator"))
+
+        if (!await authService.IsAdministrator())
         {
             CustomNotificationsService.SendAdministratorRoleMissingNotification();
             return;

@@ -5,7 +5,7 @@
 @inject DialogService DialogService
 @inject ApplicationDbContext DbContext
 @inject NotificationService NotificationService
-@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject ICustomAuthService authService
 @inject ICustomNotificationsService CustomNotificationsService
 
 @code {
@@ -18,23 +18,18 @@
     [Parameter]
     public DateTime? PrefferedEndTime { get; set; }
 
-    private Reservation reservation;
+    private Reservation? reservation;
+    private int shiftOption;
 
-    private IEnumerable<ReservationType> reservationTypes;
-    private IEnumerable<PlannerUser> plannerUsers;
+    private IEnumerable<ReservationType>? reservationTypes;
+    private IEnumerable<PlannerUser>? plannerUsers;
 
-    public ClaimsPrincipal User { 
-        get 
-        { 
-            return AuthenticationStateProvider.GetAuthenticationStateAsync().Result.User; 
-        }
-    }
-
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
-        reservation = new Reservation { 
-            PlanningSessionId = PlanningSession.Id,
-        };
+        reservation = new Reservation
+            {
+                PlanningSessionId = PlanningSession.Id,
+            };
 
         if (PrefferedStartTime != null)
         {
@@ -54,19 +49,16 @@
 
         plannerUsers = DbContext.PlannerUsers.ToList();
 
-        if (User.Identity!.IsAuthenticated && !User.IsInRole("Administrator"))
+        if (await authService.IsUserAuthenticated() && !await authService.IsAdministrator())
         {
-            reservation.PlannerUser = plannerUsers.FirstOrDefault(pu => pu.Email == User.Identity.Name);
+            var userName = await authService.GetLoggedUserName();
+            reservation.PlannerUser = plannerUsers.FirstOrDefault(pu => pu.Email == userName);
         }
-
-        base.OnInitialized();
     }
 
-    void OnSubmit(Reservation model)
+    async Task OnSubmit(Reservation model)
     {
-        var authState = AuthenticationStateProvider.GetAuthenticationStateAsync().Result;
-
-        if (authState?.User?.Identity?.IsAuthenticated == false)
+        if (!await authService.IsUserAuthenticated())
         {
             CustomNotificationsService.SendAuthorizationMissingNotification();
             DialogService.Close(null);
@@ -75,14 +67,69 @@
 
         if (model.Type == ReservationType.UnavailabilityPaid)
         {
-            // Change day to information about day shif and night shift
-            model.From = model.From.AddHours(7);
-            model.To = model.From.AddDays(1).AddHours(12);
+            var doubledReservation = DbContext.Reservations.FirstOrDefault(r =>
+                r.PlanningSessionId == model.PlanningSessionId &&
+                r.Type == ReservationType.UnavailabilityPaid &&
+                r.From.Date == model.From.Date);
+
+            if (doubledReservation != null)
+            {
+                CustomNotificationsService.SendReservationAlreadyExistsNotification();
+                return;
+            }
+        }
+        else if (model.Type == ReservationType.UnavailabilityFree)
+        {
+            var doubledReservation = DbContext.Reservations.FirstOrDefault(r =>
+                r.PlanningSessionId == model.PlanningSessionId &&
+                r.Type == ReservationType.UnavailabilityPaid &&
+                r.From == model.From &&
+                r.To == model.To);
+
+            if (doubledReservation != null)
+            {
+                CustomNotificationsService.SendReservationAlreadyExistsNotification();
+                return;
+            }
+        }
+
+        var result = new Reservation()
+        {
+            PlannerUser = model.PlannerUser,
+            PlannerUserId = model.PlannerUserId,
+            PlanningSessionId = model.PlanningSessionId,
+            Comment = model.Comment,
+            UserId = model.UserId,
+            Type = model.Type
+        };
+
+        if (model.Type == ReservationType.UnavailabilityPaid)
+        {
+            result.From = model.From.Date.AddHours(7);
+            result.To = model.From.Date.AddHours(24);
+        }
+        else if (model.Type == ReservationType.UnavailabilityFree)
+        {
+            if (shiftOption == 1) // day shift
+            {
+                result.From = model.From.Date.AddHours(7);
+                result.To = model.From.Date.AddHours(19);
+            }
+            else // night shift
+            {
+                result.From = model.From.Date.AddHours(19);
+                result.To = model.From.Date.AddHours(24);
+            }
+        }
+        else if (model.Type == ReservationType.SchooolReunion)
+        {
+            result.From = model.From;
+            result.To = model.To;
         }
 
         try
         {
-            DbContext.Add(model);
+            DbContext.Add(result);
             DbContext.SaveChanges();
 
             CustomNotificationsService.SendReservationCreateSuccessNotification();
@@ -98,6 +145,14 @@
     void OnCancel()
     {
         DialogService.Close(null);
+    }
+
+    private void OnReservationTypeChanged(ChangeEventArgs e)
+    {
+        var selectedType = (ReservationType)e.Value;
+        reservation.Type = selectedType;
+
+        // Additional logic based on the selected reservation type can be added here
     }
 
     private bool ValidateFromAndToDateRangeOrder()
@@ -129,6 +184,20 @@
 
         return false;
     }
+
+    private void SchoolReunionCalendarDateRender(DateRenderEventArgs args)
+    {
+        if (args.Date.DayOfWeek == DayOfWeek.Friday)
+        {
+            args.Attributes.Add("style", "background-color: #ff6d41; border-color: white;");
+        }
+
+        args.Disabled = args.Disabled ||
+            args.Date.DayOfWeek == DayOfWeek.Monday ||
+            args.Date.DayOfWeek == DayOfWeek.Tuesday ||
+            args.Date.DayOfWeek == DayOfWeek.Wednesday ||
+            args.Date.DayOfWeek == DayOfWeek.Thursday;
+    }
 }
 
 <RadzenTemplateForm TItem="Reservation"
@@ -147,34 +216,31 @@
         @if (reservation.Type == ReservationType.UnavailabilityFree)
         {
             <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Wrap="FlexWrap.Wrap">
-                <RadzenLabel Text="Od"
-                Style="width: 6rem;" />
+                <RadzenLabel Text="Data"
+                             Style="width: 6rem;" />
                 <RadzenDatePicker @bind-Value="@reservation.From"
-                Name="From"
-                ShowTime="true"
-                Style="width: 15rem;" />
+                                  Name="From"
+                                  ShowTime="true"
+                                  DateFormat="yyyy/MM/dd"
+                                  Style="width: 15rem;" />
                 <RadzenRequiredValidator Component="From"
-                Text="Data od jest wymagana" />
+                                         Text="Data od jest wymagana" />
                 <RadzenCustomValidator Component="From"
-                Validator="@ValidateFromDateAndPlanningSessionFromDateOrder"
-                Text="Data 'Od' musi być późniejsza niż data rozpoczęcia sesji planowania" />
+                                       Validator="@ValidateFromDateAndPlanningSessionFromDateOrder"
+                                       Text="Data 'Od' musi być późniejsza niż data rozpoczęcia sesji planowania" />
             </RadzenStack>
 
+
             <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Wrap="FlexWrap.Wrap">
-                <RadzenLabel Text="Do"
-                Style="width: 6rem;" />
-                <RadzenDatePicker @bind-Value="@reservation.To"
-                Name="To"
-                ShowTime="true"
-                Style="width: 15rem;" />
-                <RadzenRequiredValidator Component="To"
-                Text="Data do jest wymagana" />
-                <RadzenCustomValidator Component="To"
-                Validator="@ValidateFromAndToDateRangeOrder"
-                Text="Data 'Do' musi być później niż data 'Od'" />
-                <RadzenCustomValidator Component="To"
-                Validator="@ValidateToDateAndPlanningSessionToDateOrder"
-                Text="Data 'Do' musi być wcześniejsza niż data zakończenia sesji planowania" />
+                <RadzenLabel Text="Zmiana: "
+                             Style="width: 6rem;" />
+
+                <RadzenRadioButtonList @bind-Value=@shiftOption TValue="int" Orientation="Orientation.Vertical" Style="width: 15rem;">
+                    <Items>
+                        <RadzenRadioButtonListItem Text="dzienna" Value="1" />
+                        <RadzenRadioButtonListItem Text="nocna" Value="2" />
+                    </Items>
+                </RadzenRadioButtonList>
             </RadzenStack>
         }
         else if (reservation.Type == ReservationType.UnavailabilityPaid)
@@ -194,8 +260,41 @@
                                        Text="Data 'Od' musi być późniejsza niż data rozpoczęcia sesji planowania" />
             </RadzenStack>
         }
+        else if (reservation.Type == ReservationType.SchooolReunion)
+        {
+            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Wrap="FlexWrap.Wrap">
+                <RadzenLabel Text="Od"
+                             Style="width: 6rem;" />
+                <RadzenDatePicker @bind-Value="@reservation.From"
+                                  Name="From"
+                                  ShowTime="true"
+                                  Style="width: 15rem;" />
+                <RadzenRequiredValidator Component="From"
+                                         Text="Data od jest wymagana" />
+                <RadzenCustomValidator Component="From"
+                                       Validator="@ValidateFromDateAndPlanningSessionFromDateOrder"
+                                       Text="Data 'Od' musi być późniejsza niż data rozpoczęcia sesji planowania" />
+            </RadzenStack>
 
-        @if (User.IsInRole("Administrator"))
+            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Wrap="FlexWrap.Wrap">
+                <RadzenLabel Text="Do"
+                             Style="width: 6rem;" />
+                <RadzenDatePicker @bind-Value="@reservation.To"
+                                  Name="To"
+                                  ShowTime="true"
+                                  Style="width: 15rem;" />
+                <RadzenRequiredValidator Component="To"
+                                         Text="Data do jest wymagana" />
+                <RadzenCustomValidator Component="To"
+                                       Validator="@ValidateFromAndToDateRangeOrder"
+                                       Text="Data 'Do' musi być później niż data 'Od'" />
+                <RadzenCustomValidator Component="To"
+                                       Validator="@ValidateToDateAndPlanningSessionToDateOrder"
+                                       Text="Data 'Do' musi być wcześniejsza niż data zakończenia sesji planowania" />
+            </RadzenStack>
+        }
+
+        @if (authService.IsAdministrator().Result)
         {
             <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Wrap="FlexWrap.Wrap">
                 <RadzenLabel Text="Przypisana osoba"

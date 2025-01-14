@@ -14,7 +14,7 @@
 @inject DialogService DialogService
 @inject ApplicationDbContext DbContext
 @inject NotificationService NotificationService
-@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject ICustomAuthService authService
 @inject ICustomNotificationsService CustomNotificationsService
 
 @code {
@@ -49,11 +49,9 @@
         return base.OnInitializedAsync();
     }
 
-    private void OpenAddReservationDialog(DateTime? prefferedStartTime = null, DateTime? prefferedEndTime = null)
+    private async Task OpenAddReservationDialog(DateTime? prefferedStartTime = null, DateTime? prefferedEndTime = null)
     {
-        var authState = AuthenticationStateProvider.GetAuthenticationStateAsync().Result;
-
-        if (authState.User != null && !authState.User!.Identity!.IsAuthenticated)
+        if (!await authService.IsUserAuthenticated())
         {
             CustomNotificationsService.SendAuthorizationMissingNotification();
             return;
@@ -75,19 +73,61 @@
                 });
     }
 
-    private void OpenExcludedTimeDialog()
+    private async Task OpenEditReservationDialog(Reservation reservation)
     {
-        var authState = AuthenticationStateProvider.GetAuthenticationStateAsync().Result;
-
-        if (authState.User != null && !authState.User!.Identity!.IsAuthenticated)
+        if (!await authService.IsUserAuthenticated())
         {
             CustomNotificationsService.SendAuthorizationMissingNotification();
             return;
         }
 
-        if (!authState.User!.IsInRole("Administrator"))
+        if (!PlanningSession.IsActive)
         {
-            CustomNotificationsService.SendAdministratorRoleMissingNotification();
+            CustomNotificationsService.SendSessionNotActiveNotification();
+            return;
+        }
+
+        DialogService.OnClose += OnDialogClose;
+        DialogService.Open<EditReservationDialog>(
+            "Edytuj sesję planowania",
+            new Dictionary<string, object>{
+                { "Reservation", reservation }
+                        });
+    }
+
+    private async Task OpenDeleteReservationDialog(Reservation reservation)
+    {
+        if (!await authService.IsUserAuthenticated())
+        {
+            CustomNotificationsService.SendAuthorizationMissingNotification();
+            return;
+        }
+
+        if (!PlanningSession.IsActive)
+        {
+            CustomNotificationsService.SendSessionNotActiveNotification();
+            return;
+        }
+
+        DialogService.OnClose += OnDialogClose;
+        DialogService.Open<DeleteReservationDialog>(
+            "Usuń rezerwację",
+            new Dictionary<string, object>{
+                { "Reservation", reservation }
+                        });
+    }
+
+    private async Task OpenAddExcludedTimeDialog()
+    {
+        if (!await authService.IsUserAuthenticated())
+        {
+            CustomNotificationsService.SendAuthorizationMissingNotification();
+            return;
+        }
+
+        if (!await authService.IsAdministrator())
+        {
+            CustomNotificationsService.SendAuthorizationMissingNotification();
             return;
         }
 
@@ -105,43 +145,17 @@
             });
     }
 
-    private void OpenEditDialog(Reservation reservation)
+    private async Task OpenEditExcludedTimeDialog(ExcludedTime excludedTime)
     {
-        var authState = AuthenticationStateProvider.GetAuthenticationStateAsync().Result;
-
-        if (authState.User != null && !authState.User!.Identity!.IsAuthenticated)
+        if (!await authService.IsUserAuthenticated())
         {
             CustomNotificationsService.SendAuthorizationMissingNotification();
             return;
         }
 
-        if (!PlanningSession.IsActive)
-        {
-            CustomNotificationsService.SendSessionNotActiveNotification();
-            return;
-        }
-
-        DialogService.OnClose += OnDialogClose;
-        DialogService.Open<EditReservationDialog>(
-            "Edytuj sesję planowania",
-            new Dictionary<string, object>{
-                { "Reservation", reservation }
-                    });
-    }
-
-    private void OpenEditDialog(ExcludedTime excludedTime)
-    {
-        var authState = AuthenticationStateProvider.GetAuthenticationStateAsync().Result;
-
-        if (!authState.User!.Identity!.IsAuthenticated)
+        if (!await authService.IsAdministrator())
         {
             CustomNotificationsService.SendAuthorizationMissingNotification();
-            return;
-        }
-
-        if (!authState.User!.IsInRole("Administrator"))
-        {
-            CustomNotificationsService.SendAdministratorRoleMissingNotification();
             return;
         }
 
@@ -159,43 +173,17 @@
             });
     }
 
-    private void OpenDeleteDialog(Reservation reservation)
+    private async Task OpenDeleteExcludedTimeDialog(ExcludedTime excludedTime)
     {
-        var authState = AuthenticationStateProvider.GetAuthenticationStateAsync().Result;
-
-        if (authState.User != null && !authState.User!.Identity!.IsAuthenticated)
+        if (!await authService.IsUserAuthenticated())
         {
             CustomNotificationsService.SendAuthorizationMissingNotification();
             return;
         }
 
-        if (!PlanningSession.IsActive)
-        {
-            CustomNotificationsService.SendSessionNotActiveNotification();
-            return;
-        }
-
-        DialogService.OnClose += OnDialogClose;
-        DialogService.Open<DeleteReservationDialog>(
-            "Usuń rezerwację",
-            new Dictionary<string, object>{
-                { "Reservation", reservation }
-                    });
-    }
-
-    private void OpenDeleteDialog(ExcludedTime excludedTime)
-    {
-        var authState = AuthenticationStateProvider.GetAuthenticationStateAsync().Result;
-
-        if (!authState.User!.Identity!.IsAuthenticated)
+        if (!await authService.IsAdministrator())
         {
             CustomNotificationsService.SendAuthorizationMissingNotification();
-            return;
-        }
-
-        if (!authState.User!.IsInRole("Administrator"))
-        {
-            CustomNotificationsService.SendAdministratorRoleMissingNotification();
             return;
         }
 
@@ -264,7 +252,7 @@
 
     async Task OnAppointmentSelect(SchedulerAppointmentSelectEventArgs<Reservation> args)
     {
-        OpenEditDialog(args.Data);
+        OpenEditReservationDialog(args.Data);
     }
 
     void OnAppointmentRender(SchedulerAppointmentRenderEventArgs<Reservation> args)
@@ -406,14 +394,14 @@ else
                                               ButtonStyle="ButtonStyle.Light"
                                               Variant="Variant.Flat"
                                               Size="ButtonSize.Medium"
-                                              Click="@(args => OpenEditDialog(reservation))"
+                                              Click="@(args => OpenEditReservationDialog(reservation))"
                                               @onclick:stopPropagation="true">
                                 </RadzenButton>
                                 <RadzenButton Icon="delete"
                                               ButtonStyle="ButtonStyle.Light"
                                               Variant="Variant.Flat"
                                               Size="ButtonSize.Medium"
-                                              Click="@(args => OpenDeleteDialog(reservation))"
+                                              Click="@(args => OpenDeleteReservationDialog(reservation))"
                                               @onclick:stopPropagation="true">
                                 </RadzenButton>
                             </RadzenStack>
@@ -423,7 +411,7 @@ else
             </RadzenDataGrid>
         </RadzenTabsItem>
         <RadzenTabsItem Text="Dni wyłączone">
-            <RadzenButton Click=@(args => OpenExcludedTimeDialog())
+            <RadzenButton Click=@(args => OpenAddExcludedTimeDialog())
                           Text="Dodaj Regułę"
                           Icon="add_circle"
                           Style="margin-bottom: 15px"
@@ -476,14 +464,14 @@ else
                                               ButtonStyle="ButtonStyle.Light"
                                               Variant="Variant.Flat"
                                               Size="ButtonSize.Medium"
-                                              Click="@(args => OpenEditDialog(excludedTime))"
+                                              Click="@(args => OpenEditExcludedTimeDialog(excludedTime))"
                                               @onclick:stopPropagation="true">
                                 </RadzenButton>
                                 <RadzenButton Icon="delete"
                                               ButtonStyle="ButtonStyle.Light"
                                               Variant="Variant.Flat"
                                               Size="ButtonSize.Medium"
-                                              Click="@(args => OpenDeleteDialog(excludedTime))"
+                                              Click="@(args => OpenDeleteExcludedTimeDialog(excludedTime))"
                                               @onclick:stopPropagation="true">
                                 </RadzenButton>
                             </RadzenStack>

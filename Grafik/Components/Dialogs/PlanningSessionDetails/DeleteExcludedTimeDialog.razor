@@ -4,18 +4,16 @@
 @inject DialogService DialogService
 @inject ApplicationDbContext DbContext
 @inject NotificationService NotificationService
-@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject ICustomAuthService authService
 @inject ICustomNotificationsService CustomNotificationsService
 
 @code {
     [Parameter]
     public required ExcludedTime ExcludedTime { get; set; }
 
-    void OnSubmit(ExcludedTime model)
+    async Task OnSubmit(ExcludedTime model)
     {
-        var authState = AuthenticationStateProvider.GetAuthenticationStateAsync().Result;
-
-        if (authState?.User?.Identity?.IsAuthenticated == false)
+        if (!await authService.IsUserAuthenticated())
         {
             CustomNotificationsService.SendAuthorizationMissingNotification();
             DialogService.Close(null);

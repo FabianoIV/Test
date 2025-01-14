@@ -11,7 +11,7 @@
 @inject DialogService DialogService
 @inject ApplicationDbContext DbContext
 @inject NotificationService NotificationService
-@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject ICustomAuthService authService
 @inject ICustomNotificationsService CustomNotificationsService
 
 @rendermode InteractiveServer
@@ -29,17 +29,15 @@
         await base.OnInitializedAsync();
     }
 
-    private void OpenAddDialog()
+    private async Task OpenAddUserDialog()
     {
-        var authState = AuthenticationStateProvider.GetAuthenticationStateAsync().Result;
-
-        if (authState.User != null && !authState.User!.Identity.IsAuthenticated)
+        if (!await authService.IsUserAuthenticated())
         {
             CustomNotificationsService.SendAuthorizationMissingNotification();
             return;
         }
 
-        if (!authState.User!.IsInRole("Administrator"))
+        if (!await authService.IsAdministrator())
         {
             CustomNotificationsService.SendAuthorizationMissingNotification();
             return;
@@ -49,17 +47,15 @@
         DialogService.Open<AddPlannerUserDialog>("Utwórz użytkownika");
     }
 
-    private void OpenEditDialog(PlannerUser plannerUser)
+    private async Task OpenEditUserDialog(PlannerUser plannerUser)
     {
-        var authState = AuthenticationStateProvider.GetAuthenticationStateAsync().Result;
-
-        if (authState.User != null && !authState.User!.Identity.IsAuthenticated)
+        if (!await authService.IsUserAuthenticated())
         {
             CustomNotificationsService.SendAuthorizationMissingNotification();
             return;
         }
 
-        if (!authState.User!.IsInRole("Administrator"))
+        if (!await authService.IsAdministrator())
         {
             CustomNotificationsService.SendAuthorizationMissingNotification();
             return;
@@ -73,17 +69,15 @@
             });
     }
 
-    private void OpenDeleteDialog(PlannerUser plannerUser)
+    private async Task OpenDeleteUserDialog(PlannerUser plannerUser)
     {
-        var authState = AuthenticationStateProvider.GetAuthenticationStateAsync().Result;
-
-        if (authState.User != null && !authState.User!.Identity.IsAuthenticated)
+        if (!await authService.IsUserAuthenticated())
         {
             CustomNotificationsService.SendAuthorizationMissingNotification();
             return;
         }
 
-        if (!authState.User!.IsInRole("Administrator"))
+        if (!await authService.IsAdministrator())
         {
             CustomNotificationsService.SendAuthorizationMissingNotification();
             return;
@@ -107,7 +101,7 @@
 
 <h3>List osób w planerze</h3>
 
-<RadzenButton Click=@(args => OpenAddDialog())
+<RadzenButton Click=@(args => OpenAddUserDialog())
               Text="Utwórz"
               Icon="add_circle"
               Style="margin-bottom: 1rem; margin-top: 1 rem;"
@@ -141,14 +135,14 @@
                                   ButtonStyle="ButtonStyle.Light"
                                   Variant="Variant.Flat"
                                   Size="ButtonSize.Medium"
-                                  Click="@(args => OpenEditDialog(plannerUser))"
+                                  Click="@(args => OpenEditUserDialog(plannerUser))"
                                   @onclick:stopPropagation="true">
                     </RadzenButton>
                     <RadzenButton Icon="delete"
                                   ButtonStyle="ButtonStyle.Light"
                                   Variant="Variant.Flat"
                                   Size="ButtonSize.Medium"
-                                  Click="@(args => OpenDeleteDialog(plannerUser))"
+                                  Click="@(args => OpenDeleteUserDialog(plannerUser))"
                                   @onclick:stopPropagation="true">
                     </RadzenButton>
                 </RadzenStack>

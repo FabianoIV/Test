@@ -5,7 +5,7 @@
 @inject DialogService DialogService
 @inject ApplicationDbContext DbContext
 @inject NotificationService NotificationService
-@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject ICustomAuthService authService
 @inject ICustomNotificationsService CustomNotificationsService
 
 @code {
@@ -15,13 +15,7 @@
     private IEnumerable<ReservationType> reservationTypes;
     private IEnumerable<PlannerUser> plannerUsers;
 
-    public ClaimsPrincipal User
-    {
-        get
-        {
-            return AuthenticationStateProvider.GetAuthenticationStateAsync().Result.User;
-        }
-    }
+    private int shiftOption = 1;
 
     protected override void OnInitialized()
     {
@@ -33,23 +27,33 @@
 
         plannerUsers = DbContext.PlannerUsers.ToList();
 
+        if (Reservation.Type == ReservationType.UnavailabilityFree)
+        {
+            if (Reservation.From.Hour == 7)
+            {
+                shiftOption = 1;
+            }
+            else
+            {
+                shiftOption = 2;
+            }
+        }
+
         base.OnInitialized();
     }
 
-    void OnSubmit(Reservation model)
+    async Task OnSubmit(Reservation model)
     {
-        var authState = AuthenticationStateProvider.GetAuthenticationStateAsync().Result;
-
-        if (authState?.User?.Identity?.IsAuthenticated == false)
+        if (!await authService.IsUserAuthenticated())
         {
             CustomNotificationsService.SendAuthorizationMissingNotification();
             DialogService.Close(null);
             return;
         }
 
-        if (!User.IsInRole("Administrator"))
+        if (!await authService.IsAdministrator())
         {
-            if (model.PlannerUser.Email != authState.User.Identity.Name)
+            if (model.PlannerUser.Email != (await authService.GetLoggedUserName()))
             {
                 CustomNotificationsService.SendNotReservationOwnerNotification();
                 return;
@@ -81,24 +85,6 @@
     <RadzenStack Gap="1rem">
 
         <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Wrap="FlexWrap.Wrap">
-            <RadzenLabel Text="Od"
-                         Style="width: 6rem;" />
-            <RadzenDatePicker @bind-Value=@Reservation.From
-                              Name="Od"
-                              ShowCalendarWeek />
-            <RadzenRequiredValidator Component="Od" Text="Data od jest wymagana" />
-        </RadzenStack>
-
-        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Wrap="FlexWrap.Wrap">
-            <RadzenLabel Text="Do"
-                         Style="width: 6rem;" />
-            <RadzenDatePicker @bind-Value=@Reservation.To
-                              Name="Do"
-                              ShowCalendarWeek />
-            <RadzenRequiredValidator Component="Do" Text="Data do jest wymagana" />
-        </RadzenStack>
-
-        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Wrap="FlexWrap.Wrap">
             <RadzenLabel Text="Typ rezerwacji"
                          Style="width: 6rem;" />
             <RadzenDropDown @bind-Value=@Reservation.Type
@@ -107,7 +93,69 @@
                             Name="DropDownBindValue" />
         </RadzenStack>
 
-        @if (User.IsInRole("Administrator"))
+        @if (Reservation.Type == ReservationType.UnavailabilityFree)
+        {
+            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Wrap="FlexWrap.Wrap">
+                <RadzenLabel Text="Data"
+                             Style="width: 6rem;" />
+                <RadzenDatePicker @bind-Value="@Reservation.From"
+                                  Name="From"
+                                  ShowTime="true"
+                                  DateFormat="yyyy/MM/dd"
+                                  Style="width: 15rem;" />
+                <RadzenRequiredValidator Component="From"
+                                         Text="Data od jest wymagana" />
+            </RadzenStack>
+
+
+            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Wrap="FlexWrap.Wrap">
+                <RadzenLabel Text="Zmiana: "
+                             Style="width: 6rem;" />
+
+                <RadzenRadioButtonList @bind-Value=@shiftOption TValue="int" Orientation="Orientation.Vertical" Style="width: 15rem;">
+                    <Items>
+                        <RadzenRadioButtonListItem Text="dzienna" Value="1" />
+                        <RadzenRadioButtonListItem Text="nocna" Value="2" />
+                    </Items>
+                </RadzenRadioButtonList>
+            </RadzenStack>
+        }
+        else if (Reservation.Type == ReservationType.UnavailabilityPaid)
+        {
+            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Wrap="FlexWrap.Wrap">
+                <RadzenLabel Text="Data"
+                             Style="width: 6rem;" />
+                <RadzenDatePicker @bind-Value="@Reservation.From"
+                                  Name="From"
+                                  ShowTime="true"
+                                  DateFormat="yyyy/MM/dd"
+                                  Style="width: 15rem;" />
+                <RadzenRequiredValidator Component="From"
+                                         Text="Data od jest wymagana" />
+            </RadzenStack>
+        }
+        else if (Reservation.Type == ReservationType.SchooolReunion)
+        {
+            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Wrap="FlexWrap.Wrap">
+                <RadzenLabel Text="Od"
+                             Style="width: 6rem;" />
+                <RadzenDatePicker @bind-Value=@Reservation.From
+                                  Name="Od"
+                                  ShowCalendarWeek />
+                <RadzenRequiredValidator Component="Od" Text="Data od jest wymagana" />
+            </RadzenStack>
+
+            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Wrap="FlexWrap.Wrap">
+                <RadzenLabel Text="Do"
+                             Style="width: 6rem;" />
+                <RadzenDatePicker @bind-Value=@Reservation.To
+                                  Name="Do"
+                                  ShowCalendarWeek />
+                <RadzenRequiredValidator Component="Do" Text="Data do jest wymagana" />
+            </RadzenStack>
+        }
+
+        @if (authService.IsAdministrator().Result)
         {
             <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Wrap="FlexWrap.Wrap">
                 <RadzenLabel Text="Przypisana osoba"

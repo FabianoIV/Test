@@ -20,10 +20,24 @@ public class Reservation
     {
         get
         {
+            if (Type == ReservationType.UnavailabilityPaid)
+            {
+                return $"{PlannerUser?.Name ?? "Nieznany"}: Niedostępność płatna za dzień {From.Date:yyyy-MM-dd} (Zmiana dzienna i nocna)";
+            }
+            else if (Type == ReservationType.UnavailabilityFree)
+            {
+                var shiftText = From.Hour == 7 ? "zmiana dzienna" : "zmiana nocna";
+                return $"{PlannerUser?.Name ?? "Nieznany"}: Niedostępność bezpłatna ({shiftText}) w dniu {From.Date:yyyy-MM-dd}";
+            }
+            else if (Type == ReservationType.SchooolReunion)
+            {
+                return $"{PlannerUser?.Name ?? "Nieznany"}: zjazd od {From.Date:yyyy-MM-dd} do {To.Date:yyyy-MM-dd}";
+            }
+
             var typeDisplay = Type.GetType()
-                                  .GetField(Type.ToString())
-                                  ?.GetCustomAttributes(typeof(DisplayAttribute), false)
-                                  .FirstOrDefault() as DisplayAttribute;
+                      .GetField(Type.ToString())
+                      ?.GetCustomAttributes(typeof(DisplayAttribute), false)
+                      .FirstOrDefault() as DisplayAttribute;
             var typeDescription = typeDisplay?.Description ?? Type.ToString();
             return $"{typeDescription} rezerwacja od {From:yyyy-MM-dd HH:mm} do {To:yyyy-MM-dd HH:mm} przez {PlannerUser?.Name ?? "Nieznany"}";
         }

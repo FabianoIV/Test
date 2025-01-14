@@ -36,6 +36,7 @@ public interface ICustomNotificationsService
     void SendReservationDeleteErrorNotification();
     void SendReservationCreateSuccessNotification();
     void SendEditReservationSuccessNotification();
+    void SendReservationAlreadyExistsNotification();
     #endregion
 
     #region PlannerUser Notifications
@@ -287,6 +288,16 @@ public class CustomNotificationsService : ICustomNotificationsService
             Severity = NotificationSeverity.Success,
             Summary = "Sukces",
             Detail = "Zaktualizowano rezerwację"
+        });
+    }
+
+    public void SendReservationAlreadyExistsNotification()
+    {
+        _notificationService.Notify(new NotificationMessage
+        {
+            Severity = NotificationSeverity.Warning,
+            Summary = "Błąd",
+            Detail = "Rezerwacja już istnieje"
         });
     }
     #endregion

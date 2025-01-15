@@ -259,7 +259,38 @@
 
     void OnAppointmentRender(SchedulerAppointmentRenderEventArgs<Reservation> args)
     {
-        var color = ColorHelper.GenerateColorFromString(args.Data.PlannerUser.Email);
+        var reservation = args.Data;
+        string color = "#000000"; // black color
+
+        if (reservation.Type == ReservationType.SchooolReunion)
+        {
+            if (!string.IsNullOrEmpty(reservation.PlannerUser.SchoolReuninionCardColor))
+            {
+                color = ColorHelper.ConvertRadzenControlColorToHexColor(reservation.PlannerUser.SchoolReuninionCardColor);
+            }
+        }
+        else if (reservation.Type == ReservationType.UnavailabilityPaid)
+        {
+            if (!string.IsNullOrEmpty(reservation.PlannerUser.UnavailabilityPaidCardColor))
+            {
+                color = ColorHelper.ConvertRadzenControlColorToHexColor(reservation.PlannerUser.UnavailabilityPaidCardColor);
+            }
+        }
+        else if (reservation.Type == ReservationType.UnavailabilityFree && reservation.IsDayShift)
+        {
+            if (!string.IsNullOrEmpty(reservation.PlannerUser.UnavailabilityFreeDayShiftCardColor))
+            {
+                color = ColorHelper.ConvertRadzenControlColorToHexColor(reservation.PlannerUser.UnavailabilityFreeDayShiftCardColor);
+            }
+        }
+        else if (reservation.Type == ReservationType.UnavailabilityFree && reservation.IsNightShift)
+        {
+            if (!string.IsNullOrEmpty(reservation.PlannerUser.UnavailabilityFreeNightShiftCardColor))
+            {
+                color = ColorHelper.ConvertRadzenControlColorToHexColor(reservation.PlannerUser.UnavailabilityFreeNightShiftCardColor);
+            }
+        }
+
         args.Attributes["style"] = $"background: {color}";
     }
 

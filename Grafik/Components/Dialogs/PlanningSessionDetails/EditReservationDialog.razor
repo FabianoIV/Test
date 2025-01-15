@@ -75,6 +75,30 @@
         DialogService.Close(model);
     }
 
+    private bool ValidateFromAndToDateIsOnlyInWeekend()
+    {
+        if ((Reservation.To - Reservation.From).Days > 3)
+        {
+            return false;
+        }
+
+        if (!(Reservation.From.DayOfWeek == DayOfWeek.Friday ||
+            Reservation.From.DayOfWeek == DayOfWeek.Saturday ||
+            Reservation.From.DayOfWeek == DayOfWeek.Sunday))
+        {
+            return false;
+        }
+
+        if (!(Reservation.To.DayOfWeek == DayOfWeek.Friday ||
+            Reservation.To.DayOfWeek == DayOfWeek.Saturday ||
+            Reservation.To.DayOfWeek == DayOfWeek.Sunday))
+        {
+            return false;
+        }
+
+        return true;
+    }
+
     void OnCancel()
     {
         DialogService.Close(null);
@@ -152,6 +176,9 @@
                                   Name="Do"
                                   ShowCalendarWeek />
                 <RadzenRequiredValidator Component="Do" Text="Data do jest wymagana" />
+                <RadzenCustomValidator Component="Do"
+                                       Validator="@ValidateFromAndToDateIsOnlyInWeekend"
+                                       Text="Zjazd może odbywać się tylko w weekend (piątek, sobota, niedziela)" />
             </RadzenStack>
         }
 

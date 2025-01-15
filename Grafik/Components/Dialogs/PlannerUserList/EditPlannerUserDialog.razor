@@ -99,6 +99,47 @@
                            Style="width: 12rem;" />
         </RadzenStack>
 
+        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Wrap="FlexWrap.Wrap">
+            <RadzenLabel Text="Kolor karty - zjazdy"
+                         Style="width: 6rem;" />
+            <RadzenColorPicker @bind-Value=PlannerUser.SchoolReuninionCardColor 
+                               ShowHSV=true 
+                               ShowRGBA=true 
+                               ShowColors=true
+                               ShowButton=false />
+        </RadzenStack>
+
+        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Wrap="FlexWrap.Wrap">
+            <RadzenLabel Text="Kolor karty - niedostępność płatna"
+                         Style="width: 6rem;" />
+            <RadzenColorPicker @bind-Value=PlannerUser.UnavailabilityPaidCardColor
+                               ShowHSV=true
+                               ShowRGBA=true
+                               ShowColors=true
+                               ShowButton=false />
+        </RadzenStack>
+
+        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Wrap="FlexWrap.Wrap">
+            <RadzenLabel Text="Kolor karty - niedostępnośc bezpłatna (zmiana dzienna)"
+                         Style="width: 6rem;" />
+            <RadzenColorPicker @bind-Value=PlannerUser.UnavailabilityFreeDayShiftCardColor
+                               ShowHSV=true
+                               ShowRGBA=true
+                               ShowColors=true
+                               ShowButton=false />
+        </RadzenStack>
+
+        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Wrap="FlexWrap.Wrap">
+            <RadzenLabel Text="Kolor karty - niedostępnośc bezpłatna (zmiana nocna)"
+                         Style="width: 6rem;" />
+            <RadzenColorPicker @bind-Value=PlannerUser.UnavailabilityFreeNightShiftCardColor
+                               ShowHSV=true
+                               ShowRGBA=true
+                               ShowColors=true
+                               ShowButton=false />
+        </RadzenStack>
+
+
         @if (authService.IsAdministrator().Result){
             <RadzenButton Text="Nadaj prawa administarcyjne"
                           Click="() => OnClickAddAdministratorRoleToUser()" />

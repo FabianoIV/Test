@@ -9,14 +9,14 @@
 @inject ICustomNotificationsService CustomNotificationsService
 
 @code {
-    [Parameter]
-    public required PlanningSession PlanningSession { get; set; }
+        [Parameter]
+        public required PlanningSession PlanningSession { get; set; }
 
-    [Parameter]
-    public DateTime? PrefferedStartTime { get; set; }
+        [Parameter]
+        public DateTime? PrefferedStartTime { get; set; }
 
-    [Parameter]
-    public DateTime? PrefferedEndTime { get; set; }
+        [Parameter]
+        public DateTime? PrefferedEndTime { get; set; }
 
     private Reservation? reservation;
     private int shiftOption;
@@ -29,6 +29,7 @@
         reservation = new Reservation
             {
                 PlanningSessionId = PlanningSession.Id,
+                To = DateTime.Today.AddHours(23).AddMinutes(59),
             };
 
         if (PrefferedStartTime != null)
@@ -38,7 +39,7 @@
 
         if (PrefferedEndTime != null)
         {
-            reservation.To = PrefferedEndTime.Value;
+            reservation.To = PrefferedEndTime.Value.AddHours(23).AddMinutes(59);
         }
 
         reservationTypes = new List<ReservationType>() {
@@ -187,19 +188,26 @@
 
     private bool ValidateFromAndToDateIsOnlyInWeekend()
     {
-        if (reservation.From.DayOfWeek == DayOfWeek.Friday &&
-            reservation.From.DayOfWeek == DayOfWeek.Saturday &&
-            reservation.From.DayOfWeek == DayOfWeek.Sunday &&
-            reservation.To.DayOfWeek == DayOfWeek.Friday &&
-            reservation.To.DayOfWeek == DayOfWeek.Saturday &&
-            reservation.To.DayOfWeek == DayOfWeek.Sunday &&
-            (reservation.To - reservation.From).Days <= 3)
+        if ((reservation.To - reservation.From).Days > 3)
         {
-            return true;
+            return false;
         }
 
-        return false;
+        if (!(reservation.From.DayOfWeek == DayOfWeek.Friday ||
+            reservation.From.DayOfWeek == DayOfWeek.Saturday ||
+            reservation.From.DayOfWeek == DayOfWeek.Sunday))
+        {
+            return false;
+        }
 
+        if (!(reservation.To.DayOfWeek == DayOfWeek.Friday ||
+            reservation.To.DayOfWeek == DayOfWeek.Saturday ||
+            reservation.To.DayOfWeek == DayOfWeek.Sunday))
+        {
+            return false;
+        }
+
+        return true;
     }
 
     private void SchoolReunionCalendarDateRender(DateRenderEventArgs args)
@@ -299,7 +307,8 @@
                 <RadzenDatePicker @bind-Value="@reservation.To"
                                   Name="To"
                                   ShowTime="true"
-                                  Style="width: 15rem;" />
+                                  Style="width: 15rem;"
+                                  />
                 <RadzenRequiredValidator Component="To"
                                          Text="Data do jest wymagana" />
                 <RadzenCustomValidator Component="To"
@@ -310,7 +319,7 @@
                                        Text="Data 'Do' musi być wcześniejsza niż data zakończenia sesji planowania" />
                 <RadzenCustomValidator Component="To"
                                        Validator="@ValidateFromAndToDateIsOnlyInWeekend"
-                                       Text="Zjazd może odbywać się tylko w weekend"/>
+                                       Text="Zjazd może odbywać się tylko w weekend (piątek, sobota, niedziela)"/>
             </RadzenStack>
         }
 

@@ -7,4 +7,9 @@ public class PlannerUser
     public DateTime Updated { get; set; }
     public required string Name { get; set; }
     public required string Email { get; set; }
+
+    public string SchoolReuninionCardColor { get; set; }
+    public string UnavailabilityPaidCardColor { get; set; }
+    public string UnavailabilityFreeDayShiftCardColor { get; set; }
+    public string UnavailabilityFreeNightShiftCardColor { get; set; }
 }

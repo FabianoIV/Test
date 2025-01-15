@@ -8,6 +8,7 @@
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject UserManager<ApplicationUser> UserManager
 @inject ICustomNotificationsService CustomNotificationsService
+@inject ICustomAuthService authService
 
 @code {
     [Parameter]
@@ -47,6 +48,31 @@
         DialogService.Close(model);
     }
 
+    async Task OnClickAddAdministratorRoleToUser()
+    {
+        if (!await authService.IsAdministrator())
+        {
+            CustomNotificationsService.SendAuthorizationMissingNotification();
+            return;
+        }
+
+        var user = await UserManager.FindByEmailAsync(PlannerUser.Email);
+
+        if (user == null)
+        {
+            CustomNotificationsService.SendErrorNotification("Nie znaleziono użytkownika");
+        }
+
+        var result = await authService.AddAdministratorRoleToUser(user);
+
+        if (!result)
+        {
+            CustomNotificationsService.SendErrorNotification("Nie udało się dodać roli administratora");
+        }
+
+        CustomNotificationsService.SendAddedAdministratorRoleNotification();
+    }
+
     void OnCancel()
     {
         DialogService.Close(null);
@@ -72,6 +98,11 @@
                            ShowTime="true"
                            Style="width: 12rem;" />
         </RadzenStack>
+
+        @if (authService.IsAdministrator().Result){
+            <RadzenButton Text="Nadaj prawa administarcyjne"
+                          Click="() => OnClickAddAdministratorRoleToUser()" />
+        }
 
         <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.End">
             <RadzenButton ButtonType="ButtonType.Submit" ButtonStyle="ButtonStyle.Success" Text="Edytuj" />

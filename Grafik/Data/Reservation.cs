@@ -43,6 +43,11 @@ public class Reservation
         }
     }
 
+    [NotMapped]
+    public bool IsDayShift { get { return From.Hour == 7; } }
+    [NotMapped]
+    public bool IsNightShift { get { return From.Hour == 19; } }
+
     public override string ToString()
     {
         return CalendarDescription;

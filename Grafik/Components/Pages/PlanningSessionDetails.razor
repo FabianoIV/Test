@@ -35,13 +35,15 @@
 
     List<ExcludedTime> excludedTimesCached = new List<ExcludedTime>();
 
+    private int shiftTypeFilterOption = 1;
+
     protected override Task OnInitializedAsync()
     {
         CultureInfo.DefaultThreadCurrentCulture = new CultureInfo("pl-PL");
         CultureInfo.DefaultThreadCurrentUICulture = new CultureInfo("pl-PL");
 
         PlanningSession = DbContext.PlanningSessions.Single(x => x.Id == PlanningSessionId);
-        reservations = DbContext.Reservations.Include("PlannerUser").Where(r => r.PlanningSessionId == PlanningSessionId).AsQueryable();
+        reservations = DbContext.Reservations.Include(r => r.PlannerUser).Where(r => r.PlanningSessionId == PlanningSessionId).AsQueryable();
         excludedTimes = DbContext.ExcludedTime.Where(r => r.PlanningSessionId == PlanningSessionId).AsQueryable();
 
         excludedTimesCached = excludedTimes.ToList();
@@ -263,7 +265,57 @@
 
     async Task OnAppointmentMove(SchedulerAppointmentMoveEventArgs args)
     {
-        
+
+    }
+
+    private void onShiftTypeFilterOptionChanged(int value){
+        if (value == 1)
+        {
+            reservations = DbContext.Reservations.Include("PlannerUser").Where(r => r.PlanningSessionId == PlanningSessionId).AsQueryable();
+        }
+        else if (value == 2)
+        {
+            reservations = DbContext.Reservations
+                .Include(r => r.PlannerUser)
+                .Where(r => r.PlanningSessionId == PlanningSessionId && (
+                    r.Type == ReservationType.SchooolReunion || 
+                    r.Type == ReservationType.UnavailabilityPaid || 
+                    (r.Type == ReservationType.UnavailabilityFree && r.From.Hour == 7)))
+                .AsQueryable();
+        }
+        else if (value == 3)
+        {
+            reservations = DbContext.Reservations
+                .Include(r => r.PlannerUser)
+                .Where(r => r.PlanningSessionId == PlanningSessionId && (
+                    r.Type == ReservationType.SchooolReunion ||
+                    r.Type == ReservationType.UnavailabilityPaid ||
+                    (r.Type == ReservationType.UnavailabilityFree && r.From.Hour == 19)))
+                .AsQueryable();
+        }
+        else if (value == 4)
+        {
+            reservations = DbContext.Reservations
+                .Include(r => r.PlannerUser)
+                .Where(r => r.PlanningSessionId == PlanningSessionId && r.Type == ReservationType.SchooolReunion)
+                .AsQueryable();
+        }
+        else if (value == 5)
+        {
+            reservations = DbContext.Reservations
+                .Include(r => r.PlannerUser)
+                .Where(r => r.PlanningSessionId == PlanningSessionId && r.Type == ReservationType.UnavailabilityPaid)
+                .AsQueryable();
+        }
+        else if (value == 6)
+        {
+            reservations = DbContext.Reservations
+                .Include(r => r.PlannerUser)
+                .Where(r => r.PlanningSessionId == PlanningSessionId && r.Type == ReservationType.UnavailabilityFree)
+                .AsQueryable();
+        }
+
+        this.scheduler!.Reload();
     }
 }
 
@@ -284,13 +336,28 @@ else
 
 <RadzenTabs TabPosition="TabPosition.Top" RenderMode="TabRenderMode.Client">
     <Tabs>
-        
         <RadzenTabsItem Text="Kalendarz">
             <RadzenButton Click=@(args => OpenAddReservationDialog())
                           Text="Dodaj Rezerwację"
                           Icon="add_circle"
                           Style="margin-bottom: 15px"
                           ButtonStyle="ButtonStyle.Primary" />
+
+            <RadzenRadioButtonList 
+                Name="ShiftTypeFilter" 
+                @bind-Value=@shiftTypeFilterOption 
+                TValue="int" 
+                Orientation="Orientation.Horizontal"
+                                   Change="onShiftTypeFilterOptionChanged">
+                <Items>
+                    <RadzenRadioButtonListItem Text="Wszystkie rezerwacje" Value="1" />
+                    <RadzenRadioButtonListItem Text="Zmiany dzienne" Value="2" />
+                    <RadzenRadioButtonListItem Text="Zmiany nocne" Value="3" />
+                    <RadzenRadioButtonListItem Text="Zjazdy" Value="4" />
+                    <RadzenRadioButtonListItem Text="Rezerwacje płatne" Value="5" />
+                    <RadzenRadioButtonListItem Text="Rezerwacje bezpłatne" Value="6" />
+                </Items>
+            </RadzenRadioButtonList>
 
             <RadzenScheduler @ref=@scheduler
                              SlotRender=@OnSlotRender

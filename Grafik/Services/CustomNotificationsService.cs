@@ -46,6 +46,7 @@ public interface ICustomNotificationsService
     void SendUserRemoveErrorNotification();
     void SendUserUpdateErrorNotification();
     void SendUserUpdateSuccessNotification();
+    void SendAddedAdministratorRoleNotification();
     #endregion
 
     void SendSessionNotActiveNotification();
@@ -360,6 +361,16 @@ public class CustomNotificationsService : ICustomNotificationsService
             Severity = NotificationSeverity.Success,
             Summary = "Sukces",
             Detail = "Zaktualizowano użytkownika"
+        });
+    }
+
+    public void SendAddedAdministratorRoleNotification()
+    {
+        _notificationService.Notify(new NotificationMessage
+        {
+            Severity = NotificationSeverity.Success,
+            Summary = "Sukces",
+            Detail = "Dodano rolę administratora"
         });
     }
     #endregion

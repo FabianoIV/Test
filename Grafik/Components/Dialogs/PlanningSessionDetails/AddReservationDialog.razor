@@ -185,6 +185,23 @@
         return false;
     }
 
+    private bool ValidateFromAndToDateIsOnlyInWeekend()
+    {
+        if (reservation.From.DayOfWeek == DayOfWeek.Friday &&
+            reservation.From.DayOfWeek == DayOfWeek.Saturday &&
+            reservation.From.DayOfWeek == DayOfWeek.Sunday &&
+            reservation.To.DayOfWeek == DayOfWeek.Friday &&
+            reservation.To.DayOfWeek == DayOfWeek.Saturday &&
+            reservation.To.DayOfWeek == DayOfWeek.Sunday &&
+            (reservation.To - reservation.From).Days <= 3)
+        {
+            return true;
+        }
+
+        return false;
+
+    }
+
     private void SchoolReunionCalendarDateRender(DateRenderEventArgs args)
     {
         if (args.Date.DayOfWeek == DayOfWeek.Friday)
@@ -291,6 +308,9 @@
                 <RadzenCustomValidator Component="To"
                                        Validator="@ValidateToDateAndPlanningSessionToDateOrder"
                                        Text="Data 'Do' musi być wcześniejsza niż data zakończenia sesji planowania" />
+                <RadzenCustomValidator Component="To"
+                                       Validator="@ValidateFromAndToDateIsOnlyInWeekend"
+                                       Text="Zjazd może odbywać się tylko w weekend"/>
             </RadzenStack>
         }
 

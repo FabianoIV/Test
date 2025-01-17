@@ -8,6 +8,7 @@ public interface ICustomNotificationsService
     void SendAuthorizationMissingNotification();
     void SendAdministratorRoleMissingNotification();
     void SendErrorNotification(string message);
+    void SendSuccessNotification(string message);
     #endregion
 
     #region PlanningSession Notifications
@@ -28,10 +29,10 @@ public interface ICustomNotificationsService
     void SendExcludedTimeSucessNotification();
     #endregion
 
-
     #region Reservation Notifications
     void SendEditReservationErrorNotification();
     void SendNotReservationOwnerNotification();
+    void SendSessionNotActiveNotification();
     void SendReservationDeleteSuccessNotification();
     void SendReservationDeleteErrorNotification();
     void SendReservationCreateSuccessNotification();
@@ -47,9 +48,8 @@ public interface ICustomNotificationsService
     void SendUserUpdateErrorNotification();
     void SendUserUpdateSuccessNotification();
     void SendAddedAdministratorRoleNotification();
+    void SendRemoveAdministratorRoleNotification();
     #endregion
-
-    void SendSessionNotActiveNotification();
 }
 
 public class CustomNotificationsService : ICustomNotificationsService
@@ -62,7 +62,6 @@ public class CustomNotificationsService : ICustomNotificationsService
     }
 
     #region Common Notifications
-
     public void SendAuthorizationMissingNotification()
     {
         _notificationService.Notify(new NotificationMessage
@@ -93,16 +92,16 @@ public class CustomNotificationsService : ICustomNotificationsService
         });
     }
 
-    #endregion
-
-    public void SendSessionNotActiveNotification(){
+    public void SendSuccessNotification(string message)
+    {
         _notificationService.Notify(new NotificationMessage
         {
-            Severity = NotificationSeverity.Warning,
-            Summary = "Sesja nieaktywna",
-            Detail = "Nie można dodawać rezerwacji do nieaktywnej sesji. Zapytaj administratora."
+            Severity = NotificationSeverity.Success,
+            Summary = "Sukces",
+            Detail = message
         });
     }
+    #endregion
 
     #region PlanningSession Notifications
 
@@ -242,6 +241,16 @@ public class CustomNotificationsService : ICustomNotificationsService
         });
     }
 
+    public void SendSessionNotActiveNotification()
+    {
+        _notificationService.Notify(new NotificationMessage
+        {
+            Severity = NotificationSeverity.Warning,
+            Summary = "Sesja nieaktywna",
+            Detail = "Nie można dodawać rezerwacji do nieaktywnej sesji. Zapytaj administratora."
+        });
+    }
+
     public void SendNotReservationOwnerNotification()
     {
         _notificationService.Notify(new NotificationMessage
@@ -371,6 +380,16 @@ public class CustomNotificationsService : ICustomNotificationsService
             Severity = NotificationSeverity.Success,
             Summary = "Sukces",
             Detail = "Dodano rolę administratora"
+        });
+    }
+
+    public void SendRemoveAdministratorRoleNotification()
+    {
+        _notificationService.Notify(new NotificationMessage
+        {
+            Severity = NotificationSeverity.Success,
+            Summary = "Sukces",
+            Detail = "Usunięto rolę administratora"
         });
     }
     #endregion

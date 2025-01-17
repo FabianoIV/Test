@@ -11,8 +11,10 @@ public interface ICustomAuthService
 
     Task<bool> IsUserAuthenticated();
     Task<bool> IsAdministrator();
+    Task<bool> IsAdministrator(string email);
     Task<string> GetLoggedUserName();
     Task<bool> AddAdministratorRoleToUser(ApplicationUser user);
+    Task<bool> RemoveAdministratorRoleFromUser(ApplicationUser user);
 }
 
 public class CustomAuthService : ICustomAuthService
@@ -44,6 +46,12 @@ public class CustomAuthService : ICustomAuthService
         return authState.User.IsInRole(ADMINISTRATOR_ROLE);
     }
 
+    public async Task<bool> IsAdministrator(string email)
+    {
+        var user = await userManager.FindByEmailAsync(email);
+        return await userManager.IsInRoleAsync(user, ADMINISTRATOR_ROLE);
+    }
+
     public async Task<string> GetLoggedUserName()
     {
         var authState = await authenticationStateProvider.GetAuthenticationStateAsync();
@@ -53,6 +61,12 @@ public class CustomAuthService : ICustomAuthService
     public async Task<bool> AddAdministratorRoleToUser(ApplicationUser user)
     {
         var result = await userManager.AddToRoleAsync(user, ADMINISTRATOR_ROLE);
+        return result.Succeeded;
+    }
+
+    public async Task<bool> RemoveAdministratorRoleFromUser(ApplicationUser user)
+    {
+        var result = await userManager.RemoveFromRoleAsync(user, ADMINISTRATOR_ROLE);
         return result.Succeeded;
     }
 }

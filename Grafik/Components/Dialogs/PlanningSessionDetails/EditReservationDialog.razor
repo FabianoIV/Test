@@ -12,6 +12,9 @@
     [Parameter]
     public Reservation? Reservation { get; set; }
 
+    [Parameter]
+    public UserHourLimit? UserHourLimit { get; set; }
+
     private IEnumerable<ReservationType> reservationTypes;
     private IEnumerable<PlannerUser> plannerUsers;
 
@@ -103,6 +106,39 @@
     {
         DialogService.Close(null);
     }
+
+    public async Task OnRemoveReservation()
+    {
+        if (!await authService.IsUserAuthenticated())
+        {
+            CustomNotificationsService.SendAuthorizationMissingNotification();
+            DialogService.Close(null);
+            return;
+        }
+
+        if (!await authService.IsAdministrator())
+        {
+            if (Reservation.PlannerUser != null && Reservation.PlannerUser.Email != (await authService.GetLoggedUserName()))
+            {
+                CustomNotificationsService.SendNotReservationOwnerNotification();
+                return;
+            }
+        }
+
+        try
+        {
+            DbContext.Reservations.Remove(Reservation);
+            DbContext.SaveChanges();
+
+            CustomNotificationsService.SendReservationDeleteSuccessNotification();
+        }
+        catch (Exception)
+        {
+            CustomNotificationsService.SendReservationDeleteErrorNotification();
+        }
+
+        DialogService.Close(null);
+    }
 }
 
 <RadzenTemplateForm TItem="Reservation" Data="@Reservation" Submit=@OnSubmit>
@@ -121,20 +157,20 @@
         {
             <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Wrap="FlexWrap.Wrap">
                 <RadzenLabel Text="Data"
-                             Style="width: 6rem;" />
+                Style="width: 6rem;" />
                 <RadzenDatePicker @bind-Value="@Reservation.From"
-                                  Name="From"
-                                  ShowTime="true"
-                                  DateFormat="yyyy/MM/dd"
-                                  Style="width: 15rem;" />
+                Name="From"
+                ShowTime="true"
+                DateFormat="yyyy/MM/dd"
+                Style="width: 15rem;" />
                 <RadzenRequiredValidator Component="From"
-                                         Text="Data od jest wymagana" />
+                Text="Data od jest wymagana" />
             </RadzenStack>
 
 
             <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Wrap="FlexWrap.Wrap">
                 <RadzenLabel Text="Zmiana: "
-                             Style="width: 6rem;" />
+                Style="width: 6rem;" />
 
                 <RadzenRadioButtonList @bind-Value=@shiftOption TValue="int" Orientation="Orientation.Vertical" Style="width: 15rem;">
                     <Items>
@@ -148,37 +184,37 @@
         {
             <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Wrap="FlexWrap.Wrap">
                 <RadzenLabel Text="Data"
-                             Style="width: 6rem;" />
+                Style="width: 6rem;" />
                 <RadzenDatePicker @bind-Value="@Reservation.From"
-                                  Name="From"
-                                  ShowTime="true"
-                                  DateFormat="yyyy/MM/dd"
-                                  Style="width: 15rem;" />
+                Name="From"
+                ShowTime="true"
+                DateFormat="yyyy/MM/dd"
+                Style="width: 15rem;" />
                 <RadzenRequiredValidator Component="From"
-                                         Text="Data od jest wymagana" />
+                Text="Data od jest wymagana" />
             </RadzenStack>
         }
         else if (Reservation.Type == ReservationType.SchooolReunion)
         {
             <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Wrap="FlexWrap.Wrap">
                 <RadzenLabel Text="Od"
-                             Style="width: 6rem;" />
+                Style="width: 6rem;" />
                 <RadzenDatePicker @bind-Value=@Reservation.From
-                                  Name="Od"
-                                  ShowCalendarWeek />
+                Name="Od"
+                ShowCalendarWeek />
                 <RadzenRequiredValidator Component="Od" Text="Data od jest wymagana" />
             </RadzenStack>
 
             <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Wrap="FlexWrap.Wrap">
                 <RadzenLabel Text="Do"
-                             Style="width: 6rem;" />
+                Style="width: 6rem;" />
                 <RadzenDatePicker @bind-Value=@Reservation.To
-                                  Name="Do"
-                                  ShowCalendarWeek />
+                Name="Do"
+                ShowCalendarWeek />
                 <RadzenRequiredValidator Component="Do" Text="Data do jest wymagana" />
                 <RadzenCustomValidator Component="Do"
-                                       Validator="@ValidateFromAndToDateIsOnlyInWeekend"
-                                       Text="Zjazd może odbywać się tylko w weekend (piątek, sobota, niedziela)" />
+                Validator="@ValidateFromAndToDateIsOnlyInWeekend"
+                Text="Zjazd może odbywać się tylko w weekend (piątek, sobota, niedziela)" />
             </RadzenStack>
         }
 
@@ -186,11 +222,11 @@
         {
             <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Wrap="FlexWrap.Wrap">
                 <RadzenLabel Text="Przypisana osoba"
-                             Style="width: 6rem;" />
+                Style="width: 6rem;" />
                 <RadzenDropDown @bind-Value=@Reservation.PlannerUser
-                                Data=@plannerUsers
-                                Style="width: 15rem;"
-                                Name="DropDownPlannerUser">
+                Data=@plannerUsers
+                Style="width: 15rem;"
+                Name="DropDownPlannerUser">
                     <Template Context="user">
                         <div style="display: inline-block; align-items: center;">
                             <span style="font-weight: 500; margin-left: 5px;">@user.Name</span>
@@ -199,19 +235,26 @@
                     </Template>
                 </RadzenDropDown>
                 <RadzenRequiredValidator Component="DropDownPlannerUser"
-                                         Text="Przypisana osoba jest wymagana" />
+                Text="Przypisana osoba jest wymagana" />
             </RadzenStack>
         }
         else
         {
-            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Wrap="FlexWrap.Wrap">
-                <RadzenLabel Text="Przypisana osoba"
+                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Wrap="FlexWrap.Wrap">
+                    <RadzenLabel Text="Przypisana osoba"
                              Style="width: 6rem;" />
-                <RadzenTextBox Name="PlannerUserDisabled"
-                               @bind-Value=@Reservation.PlannerUser!.Email
-                               Style="width: 15rem;"
-                               Disabled="true" />
-            </RadzenStack>
+                if (Reservation.PlannerUser != null)
+                {
+                    <RadzenTextBox Name="PlannerUserDisabled"
+                                   @bind-Value=@Reservation.PlannerUser!.Email
+                                   Style="width: 15rem;"
+                                   Disabled="true" />
+                }
+                else
+                {
+                    <div>Użytkownik nieznany</div>
+                }
+                </RadzenStack>  
         }
 
         <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Wrap="FlexWrap.Wrap">
@@ -223,7 +266,8 @@
         </RadzenStack>
 
         <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.End">
-            <RadzenButton ButtonType="ButtonType.Submit" ButtonStyle="ButtonStyle.Success" Text="Edytuj" />
+            <RadzenButton ButtonType="ButtonType.Button" ButtonStyle="ButtonStyle.Danger" Text="Usuń" Click="OnRemoveReservation" />
+            <RadzenButton ButtonType="ButtonType.Submit" ButtonStyle="ButtonStyle.Success" Text="Zapisz" />
             <RadzenButton ButtonType="ButtonType.Button" Text="Anuluj" Click="OnCancel" />
         </RadzenStack>
     </RadzenStack>

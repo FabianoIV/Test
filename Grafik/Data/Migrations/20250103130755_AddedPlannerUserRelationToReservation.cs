@@ -29,7 +29,7 @@ namespace Grafik.Migrations
                 column: "PlannerUserId",
                 principalTable: "PlannerUsers",
                 principalColumn: "Id",
-                onDelete: ReferentialAction.Cascade);
+                onDelete: ReferentialAction.Restrict);
         }
 
         /// <inheritdoc />

@@ -11,4 +11,6 @@ public class UserHourLimit
     public int UnavailabilityPaidHoursLimit { get; set; }
     public int SchooolReunionHoursLimit { get; set; }
     public int UnavailabilityFreeHoursLimit { get; set; }
+    public int UnavailabilityPaidHoursInRowLimit { get; set; }
+    public int UnavailabilityFreeHoursInRowLimit { get; set; }
 }

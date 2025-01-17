@@ -9,20 +9,21 @@
 @inject ICustomNotificationsService CustomNotificationsService
 
 @code {
-        [Parameter]
-        public required PlanningSession PlanningSession { get; set; }
+    [Parameter]
+    public required PlanningSession PlanningSession { get; set; }
 
-        [Parameter]
-        public DateTime? PrefferedStartTime { get; set; }
+    [Parameter]
+    public DateTime? PrefferedStartTime { get; set; }
 
-        [Parameter]
-        public DateTime? PrefferedEndTime { get; set; }
+    [Parameter]
+    public DateTime? PrefferedEndTime { get; set; }
 
     private Reservation? reservation;
     private int shiftOption;
 
     private IEnumerable<ReservationType>? reservationTypes;
     private IEnumerable<PlannerUser>? plannerUsers;
+    private IEnumerable<UserHourLimit>? userHourLimits;
 
     protected override async Task OnInitializedAsync()
     {
@@ -49,6 +50,7 @@
         };
 
         plannerUsers = DbContext.PlannerUsers.ToList();
+        userHourLimits = DbContext.UserHourLimit.Where(uhl => uhl.PlanningSessionId == PlanningSession.Id).ToList();
 
         if (await authService.IsUserAuthenticated() && !await authService.IsAdministrator())
         {
@@ -62,6 +64,15 @@
         if (!await authService.IsUserAuthenticated())
         {
             CustomNotificationsService.SendAuthorizationMissingNotification();
+            DialogService.Close(null);
+            return;
+        }
+
+        var userHoursLimitVerificationResult = await VerifyUserHoursLimit(model);
+
+        if (userHoursLimitVerificationResult == false)
+        {
+            CustomNotificationsService.SendErrorNotification("Przekroczony limit godzinowy dla użytkownika");
             DialogService.Close(null);
             return;
         }
@@ -141,6 +152,134 @@
         }
 
         DialogService.Close(model);
+    }
+
+    private async Task<bool> VerifyUserHoursLimit(Reservation model)
+    {
+        var userHoursLimits = userHourLimits!.FirstOrDefault(uhl => uhl.PlannerUser.Id == model.PlannerUser!.Id);
+
+        if (userHoursLimits == null)
+        {
+            return false;
+        }
+
+        // check total sums of hours in planning session
+        if (model.Type == ReservationType.UnavailabilityFree)
+        {
+            var userReservations = DbContext.Reservations.Where(r =>
+                r.PlannerUserId == model.PlannerUserId &&
+                r.Type == ReservationType.UnavailabilityFree &&
+                r.From.Date == model.From.Date).ToList();
+
+            userReservations.Add(model);
+            var userReservationsHours = userReservations.Count() * 12;
+
+            if (userReservationsHours >= userHoursLimits.UnavailabilityFreeHoursLimit)
+            {
+                return false;
+            }
+        }
+        else if (model.Type == ReservationType.UnavailabilityPaid)
+        {
+            var userReservations = DbContext.Reservations.Where(r =>
+                r.PlannerUserId == model.PlannerUserId &&
+                r.Type == ReservationType.UnavailabilityPaid &&
+                r.From.Date == model.From.Date).ToList();
+
+            userReservations.Add(model);
+
+            var userReservationsHours = userReservations.Count() * 24;
+            if (userReservationsHours >= userHoursLimits.UnavailabilityPaidHoursLimit)
+            {
+                return false;
+            }
+        }
+        else if (model.Type == ReservationType.SchooolReunion)
+        {
+            var userReservations = DbContext.Reservations.Where(r =>
+                r.PlannerUserId == model.PlannerUserId &&
+                r.Type == ReservationType.SchooolReunion &&
+                r.From.Date == model.From.Date).ToList();
+
+            userReservations.Add(model);
+            var userReservationsHours = userReservations.Sum(r => (r.To - r.From).TotalHours);
+
+            if (userReservationsHours >= userHoursLimits.SchooolReunionHoursLimit)
+            {
+                return false;
+            }
+        }
+
+        // check hours in row
+        if (model.Type == ReservationType.UnavailabilityFree)
+        {
+            var userReservations = DbContext.Reservations.Where(r =>
+                r.PlannerUserId == model.PlannerUserId &&
+                r.Type == ReservationType.UnavailabilityFree &&
+                r.From.Date == model.From.Date).ToList();
+        }
+        else if (model.Type == ReservationType.UnavailabilityPaid)
+        {
+            var daysAllowed = userHoursLimits.UnavailabilityPaidHoursInRowLimit / 24.0 - 1;
+
+            var userReservations = DbContext.Reservations.Where(r =>
+                r.PlannerUserId == model.PlannerUser.Id &&
+                r.Type == ReservationType.UnavailabilityPaid).ToList();
+
+            // If user reservations contains day with event with the same day in model
+            if (userReservations.Any(r => r.From.Date == model.From.Date))
+            {
+                var userReservationsHours = userReservations.Count() * 24;
+                if (userReservationsHours >= userHoursLimits.UnavailabilityPaidHoursInRowLimit)
+                {
+                    return false;
+                }
+            }
+
+            // Algorithm to check adjacent days with reservations
+            int aheadCounter = 0;
+            int behindCounter = 0;
+            bool isNextAhead = true;
+            bool isNextBehind = true;
+
+            for (int i = 1; i < (int)(daysAllowed + 1); i++)
+            {
+                if (isNextAhead)
+                {
+                    var reservationAhead = userReservations.FirstOrDefault(r => r.From.Date == model.From.Date.AddDays(i));
+
+                    if (reservationAhead != null)
+                    {
+                        aheadCounter++;
+                    }
+                    else
+                    {
+                        isNextAhead = false;
+                    }
+                }
+
+                var reservationBehind = userReservations.FirstOrDefault(r => r.From.Date == model.From.Date.AddDays(-i));
+
+                if (isNextBehind)
+                {
+                    if (reservationBehind != null)
+                    {
+                        behindCounter++;
+                    }
+                    else
+                    {
+                        isNextBehind = false;
+                    }
+                }
+            }
+
+            if (aheadCounter + behindCounter >= daysAllowed)
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     void OnCancel()

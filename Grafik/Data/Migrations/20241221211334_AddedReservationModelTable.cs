@@ -31,7 +31,7 @@ namespace Grafik.Migrations
                         column: x => x.PlanningSessionId,
                         principalTable: "PlanningSessions",
                         principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
+                        onDelete: ReferentialAction.Restrict);
                 });
 
             migrationBuilder.CreateIndex(

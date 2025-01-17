@@ -11,7 +11,7 @@ public class Reservation
     public ReservationType Type { get; set; }
     public DateTime From { get; set; }
     public DateTime To { get; set; }
-    public Guid PlannerUserId { get; set; }
+    public Guid? PlannerUserId { get; set; }
     public PlannerUser? PlannerUser { get; set; }
     public string? Comment { get; set; }
 

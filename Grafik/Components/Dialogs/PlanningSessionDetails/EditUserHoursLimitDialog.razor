@@ -1,0 +1,112 @@
+﻿@using Grafik.Data
+@using Grafik.Services
+
+@inject DialogService DialogService
+@inject ApplicationDbContext DbContext
+@inject NotificationService NotificationService
+@inject ICustomAuthService authService
+@inject ICustomNotificationsService CustomNotificationsService
+
+@code {
+    [Parameter]
+    public required UserHourLimit UserHourLimit { get; set; }
+
+    private async Task OnSubmit(UserHourLimit model)
+    {
+        if (!await authService.IsUserAuthenticated())
+        {
+            CustomNotificationsService.SendAuthorizationMissingNotification();
+            DialogService.Close(null);
+            return;
+        }
+
+        if (!await authService.IsAdministrator())
+        {
+            CustomNotificationsService.SendAdministratorRoleMissingNotification();
+            return;
+        }
+
+        try
+        {
+            DbContext.UserHourLimit.Update(model);
+            DbContext.SaveChanges();
+
+            CustomNotificationsService.SendSuccessNotification("Limit godzin użytkownika został zaktualizowany");
+        }
+        catch (Exception)
+        {
+            CustomNotificationsService.SendErrorNotification("Wystąpił błąd podczas aktualizacji limitu godzin użytkownika");
+        }
+
+        DialogService.Close(model);
+    }
+
+    private void OnCancel()
+    {
+        DialogService.Close(null);
+    }
+}
+
+<RadzenTemplateForm TItem="UserHourLimit" Data="@UserHourLimit" Submit=@OnSubmit>
+    <RadzenStack Gap="1rem">
+        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Wrap="FlexWrap.Wrap">
+            <RadzenLabel Text="Maks liczba dni - niedostępności płatnych"
+                         Style="width: 6rem;" />
+            <RadzenNumeric @bind-Value="@UserHourLimit.UnavailabilityPaidHoursLimit"
+                           Min="0"
+                           Max="100"
+                           Step="1"
+                           Style="width: 12rem;"
+                           Placeholder="Enter a number" />
+        </RadzenStack>
+
+        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Wrap="FlexWrap.Wrap">
+            <RadzenLabel Text="Maks liczba dni - niedostępności bezpłatnych"
+                         Style="width: 6rem;" />
+            <RadzenNumeric @bind-Value="@UserHourLimit.UnavailabilityFreeHoursLimit"
+                           Min="0"
+                           Max="100"
+                           Step="1"
+                           Style="width: 12rem;"
+                           Placeholder="Enter a number" />
+        </RadzenStack>
+
+        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Wrap="FlexWrap.Wrap">
+            <RadzenLabel Text="Maks liczba dni - zjazdów"
+                         Style="width: 6rem;" />
+            <RadzenNumeric @bind-Value="@UserHourLimit.SchooolReunionHoursLimit"
+                           Min="0"
+                           Max="100"
+                           Step="1"
+                           Style="width: 12rem;"
+                           Placeholder="Enter a number" />
+        </RadzenStack>
+
+        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Wrap="FlexWrap.Wrap">
+            <RadzenLabel Text="Maks liczba dni - niedostępności płatnych pod rząd"
+                         Style="width: 6rem;" />
+            <RadzenNumeric @bind-Value="@UserHourLimit.UnavailabilityPaidHoursInRowLimit"
+                           Min="0"
+                           Max="100"
+                           Step="1"
+                           Style="width: 12rem;"
+                           Placeholder="Enter a number" />
+        </RadzenStack>
+
+        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Wrap="FlexWrap.Wrap">
+            <RadzenLabel Text="Maks liczba dni - niedostępności bezpłatnych pod rząd"
+                         Style="width: 6rem;" />
+            <RadzenNumeric @bind-Value="@UserHourLimit.UnavailabilityFreeHoursInRowLimit"
+                           Min="0"
+                           Max="100"
+                           Step="1"
+                           Style="width: 12rem;"
+                           Placeholder="Enter a number" />
+        </RadzenStack>
+
+        <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.End">
+            <RadzenButton ButtonType="ButtonType.Submit" ButtonStyle="ButtonStyle.Success" Text="Zapisz" />
+            <RadzenButton ButtonType="ButtonType.Button" Text="Anuluj" Click="OnCancel" />
+        </RadzenStack>
+    </RadzenStack>
+</RadzenTemplateForm>

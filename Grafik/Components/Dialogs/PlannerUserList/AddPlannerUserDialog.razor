@@ -34,6 +34,11 @@
             PlannerUser.Created = now;
             PlannerUser.Updated = now;
 
+            PlannerUser.SchoolReuninionCardColor = "";
+            PlannerUser.UnavailabilityFreeDayShiftCardColor = "";
+            PlannerUser.UnavailabilityFreeNightShiftCardColor = "";
+            PlannerUser.UnavailabilityPaidCardColor = "";
+
             DbContext.PlannerUsers.Add(model);
             DbContext.SaveChanges();
 

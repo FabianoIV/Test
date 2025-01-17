@@ -14,6 +14,13 @@
     [Parameter]
     public PlannerUser? PlannerUser { get; set; }
 
+    public bool IsPlannerUserAdministrator { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        IsPlannerUserAdministrator = await authService.IsAdministrator(PlannerUser.Email);
+    }
+
     async Task OnSubmit(PlannerUser model)
     {
         var authState = AuthenticationStateProvider.GetAuthenticationStateAsync().Result;
@@ -32,8 +39,11 @@
             {
                 user.Email = model.Email;
                 user.UserName = model.Email;
+
                 await UserManager.UpdateAsync(user);
             }
+
+            PlannerUser.Updated = DateTime.Now;
 
             DbContext.PlannerUsers.Update(model);
             DbContext.SaveChanges();
@@ -70,7 +80,38 @@
             CustomNotificationsService.SendErrorNotification("Nie udało się dodać roli administratora");
         }
 
+        IsPlannerUserAdministrator = true;
+        StateHasChanged();
+
         CustomNotificationsService.SendAddedAdministratorRoleNotification();
+    }
+
+    async Task OnClickRemoveAdministratorRoleFromUser()
+    {
+        if (!await authService.IsAdministrator())
+        {
+            CustomNotificationsService.SendAuthorizationMissingNotification();
+            return;
+        }
+
+        var user = await UserManager.FindByEmailAsync(PlannerUser.Email);
+
+        if (user == null)
+        {
+            CustomNotificationsService.SendErrorNotification("Nie znaleziono użytkownika");
+        }
+
+        var result = await authService.RemoveAdministratorRoleFromUser(user);
+
+        if (!result)
+        {
+            CustomNotificationsService.SendErrorNotification("Nie udało się usunąć roli administratora");
+        }
+
+        IsPlannerUserAdministrator = false;
+        StateHasChanged();
+
+        CustomNotificationsService.SendRemoveAdministratorRoleNotification();
     }
 
     void OnCancel()
@@ -140,13 +181,21 @@
         </RadzenStack>
 
 
-        @if (authService.IsAdministrator().Result){
+        @if (authService.IsAdministrator().Result && !IsPlannerUserAdministrator)
+        {
             <RadzenButton Text="Nadaj prawa administarcyjne"
                           Click="() => OnClickAddAdministratorRoleToUser()" />
         }
 
+        @if (authService.IsAdministrator().Result && IsPlannerUserAdministrator)
+        {
+            <RadzenButton Text="Usuń prawa administarcyjne"
+                          ButtonStyle="ButtonStyle.Danger"
+                          Click="() => OnClickRemoveAdministratorRoleFromUser()" />
+        }
+
         <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.End">
-            <RadzenButton ButtonType="ButtonType.Submit" ButtonStyle="ButtonStyle.Success" Text="Edytuj" />
+            <RadzenButton ButtonType="ButtonType.Submit" ButtonStyle="ButtonStyle.Success" Text="Zapisz" />
             <RadzenButton ButtonType="ButtonType.Button" Text="Anuluj" Click="OnCancel" />
         </RadzenStack>
     </RadzenStack>

@@ -5,11 +5,14 @@
 @using Grafik.Data
 @using Grafik.Helpers
 @using Grafik.Services
+@using Microsoft.AspNetCore.Authorization
 @using Microsoft.EntityFrameworkCore
 @using Grafik.Components.Dialogs.PlanningSessionDetails
 @using System.Globalization
 
 @rendermode InteractiveServer
+
+@attribute [Authorize]
 
 @inject DialogService DialogService
 @inject ApplicationDbContext DbContext

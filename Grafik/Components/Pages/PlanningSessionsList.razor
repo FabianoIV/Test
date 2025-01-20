@@ -3,10 +3,13 @@
 @using Grafik.Components.Dialogs
 @using Grafik.Components.Dialogs.PlanningSessionList
 @using Grafik.Data
+@using Microsoft.AspNetCore.Authorization
 @using Microsoft.EntityFrameworkCore
 @using Grafik.Services
 
 @rendermode InteractiveServer
+
+@attribute [Authorize]
 
 @inject DialogService DialogService
 @inject NotificationService NotificationService

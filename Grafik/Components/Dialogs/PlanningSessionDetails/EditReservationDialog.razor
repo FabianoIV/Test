@@ -196,25 +196,50 @@
         }
         else if (Reservation.Type == ReservationType.SchooolReunion)
         {
-            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Wrap="FlexWrap.Wrap">
-                <RadzenLabel Text="Od"
-                Style="width: 6rem;" />
-                <RadzenDatePicker @bind-Value=@Reservation.From
-                Name="Od"
-                ShowCalendarWeek />
-                <RadzenRequiredValidator Component="Od" Text="Data od jest wymagana" />
-            </RadzenStack>
+            @* <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Wrap="FlexWrap.Wrap"> *@
+            @*     <RadzenLabel Text="Od" *@
+            @*     Style="width: 6rem;" /> *@
+            @*     <RadzenDatePicker @bind-Value=@Reservation.From *@
+            @*     Name="Od" *@
+            @*     ShowCalendarWeek /> *@
+            @*     <RadzenRequiredValidator Component="Od" Text="Data od jest wymagana" /> *@
+            @* </RadzenStack> *@
+
+            @* <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Wrap="FlexWrap.Wrap"> *@
+            @*     <RadzenLabel Text="Do" *@
+            @*     Style="width: 6rem;" /> *@
+            @*     <RadzenDatePicker @bind-Value=@Reservation.To *@
+            @*     Name="Do" *@
+            @*     ShowCalendarWeek /> *@
+            @*     <RadzenRequiredValidator Component="Do" Text="Data do jest wymagana" /> *@
+            @*     <RadzenCustomValidator Component="Do" *@
+            @*     Validator="@ValidateFromAndToDateIsOnlyInWeekend" *@
+            @*     Text="Zjazd może odbywać się tylko w weekend (piątek, sobota, niedziela)" /> *@
+            @* </RadzenStack> *@
 
             <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Wrap="FlexWrap.Wrap">
-                <RadzenLabel Text="Do"
-                Style="width: 6rem;" />
-                <RadzenDatePicker @bind-Value=@Reservation.To
-                Name="Do"
-                ShowCalendarWeek />
-                <RadzenRequiredValidator Component="Do" Text="Data do jest wymagana" />
-                <RadzenCustomValidator Component="Do"
-                Validator="@ValidateFromAndToDateIsOnlyInWeekend"
-                Text="Zjazd może odbywać się tylko w weekend (piątek, sobota, niedziela)" />
+                <RadzenLabel Text="Data"
+                             Style="width: 6rem;" />
+                <RadzenDatePicker @bind-Value="@Reservation.From"
+                                  Name="From"
+                                  ShowTime="true"
+                                  DateFormat="yyyy/MM/dd"
+                                  Style="width: 15rem;" />
+                <RadzenRequiredValidator Component="From"
+                                         Text="Data od jest wymagana" />
+            </RadzenStack>
+
+
+            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Wrap="FlexWrap.Wrap">
+                <RadzenLabel Text="Zmiana: "
+                             Style="width: 6rem;" />
+
+                <RadzenRadioButtonList @bind-Value=@shiftOption TValue="int" Orientation="Orientation.Vertical" Style="width: 15rem;">
+                    <Items>
+                        <RadzenRadioButtonListItem Text="dzienna" Value="1" />
+                        <RadzenRadioButtonListItem Text="nocna" Value="2" />
+                    </Items>
+                </RadzenRadioButtonList>
             </RadzenStack>
         }
 

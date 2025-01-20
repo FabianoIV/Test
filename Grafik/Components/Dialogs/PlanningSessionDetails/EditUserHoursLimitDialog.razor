@@ -71,39 +71,6 @@
                            Placeholder="Enter a number" />
         </RadzenStack>
 
-        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Wrap="FlexWrap.Wrap">
-            <RadzenLabel Text="Maks liczba dni - zjazdów"
-                         Style="width: 6rem;" />
-            <RadzenNumeric @bind-Value="@UserHourLimit.SchooolReunionHoursLimit"
-                           Min="0"
-                           Max="100"
-                           Step="1"
-                           Style="width: 12rem;"
-                           Placeholder="Enter a number" />
-        </RadzenStack>
-
-        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Wrap="FlexWrap.Wrap">
-            <RadzenLabel Text="Maks liczba dni - niedostępności płatnych pod rząd"
-                         Style="width: 6rem;" />
-            <RadzenNumeric @bind-Value="@UserHourLimit.UnavailabilityPaidHoursInRowLimit"
-                           Min="0"
-                           Max="100"
-                           Step="1"
-                           Style="width: 12rem;"
-                           Placeholder="Enter a number" />
-        </RadzenStack>
-
-        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Wrap="FlexWrap.Wrap">
-            <RadzenLabel Text="Maks liczba dni - niedostępności bezpłatnych pod rząd"
-                         Style="width: 6rem;" />
-            <RadzenNumeric @bind-Value="@UserHourLimit.UnavailabilityFreeHoursInRowLimit"
-                           Min="0"
-                           Max="100"
-                           Step="1"
-                           Style="width: 12rem;"
-                           Placeholder="Enter a number" />
-        </RadzenStack>
-
         <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.End">
             <RadzenButton ButtonType="ButtonType.Submit" ButtonStyle="ButtonStyle.Success" Text="Zapisz" />
             <RadzenButton ButtonType="ButtonType.Button" Text="Anuluj" Click="OnCancel" />

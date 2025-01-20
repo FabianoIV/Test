@@ -77,32 +77,31 @@
             return;
         }
 
-        if (model.Type == ReservationType.UnavailabilityPaid)
+        Reservation? doubledReservation = null;
+
+        doubledReservation = model.Type switch
         {
-            var doubledReservation = DbContext.Reservations.FirstOrDefault(r =>
+            ReservationType.UnavailabilityPaid => DbContext.Reservations.FirstOrDefault(r =>
                 r.PlanningSessionId == model.PlanningSessionId &&
                 r.Type == ReservationType.UnavailabilityPaid &&
-                r.From.Date == model.From.Date);
-
-            if (doubledReservation != null)
-            {
-                CustomNotificationsService.SendReservationAlreadyExistsNotification();
-                return;
-            }
-        }
-        else if (model.Type == ReservationType.UnavailabilityFree)
-        {
-            var doubledReservation = DbContext.Reservations.FirstOrDefault(r =>
+                r.From.Date == model.From.Date),
+            ReservationType.UnavailabilityFree => DbContext.Reservations.FirstOrDefault(r =>
                 r.PlanningSessionId == model.PlanningSessionId &&
                 r.Type == ReservationType.UnavailabilityPaid &&
                 r.From == model.From &&
-                r.To == model.To);
+                r.To == model.To),
+            ReservationType.SchooolReunion => DbContext.Reservations.FirstOrDefault(r =>
+                r.PlanningSessionId == model.PlanningSessionId &&
+                r.Type == ReservationType.SchooolReunion &&
+                r.From == model.From &&
+                r.To == model.To),
+            _ => null
+        };
 
-            if (doubledReservation != null)
-            {
-                CustomNotificationsService.SendReservationAlreadyExistsNotification();
-                return;
-            }
+        if (doubledReservation != null)
+        {
+            CustomNotificationsService.SendReservationAlreadyExistsNotification();
+            return;
         }
 
         var result = new Reservation()
@@ -135,8 +134,16 @@
         }
         else if (model.Type == ReservationType.SchooolReunion)
         {
-            result.From = model.From;
-            result.To = model.To;
+            if (shiftOption == 1) // day shift
+            {
+                result.From = model.From.Date.AddHours(7);
+                result.To = model.From.Date.AddHours(19);
+            }
+            else // night shift
+            {
+                result.From = model.From.Date.AddHours(19);
+                result.To = model.From.Date.AddHours(24);
+            }
         }
 
         try
@@ -156,6 +163,11 @@
 
     private async Task<bool> VerifyUserHoursLimit(Reservation model)
     {
+        if (model.Type == ReservationType.SchooolReunion)
+        {
+            return true; // No verification
+        }
+
         var userHoursLimits = userHourLimits!.FirstOrDefault(uhl => uhl.PlannerUser.Id == model.PlannerUser!.Id);
 
         if (userHoursLimits == null)
@@ -190,90 +202,6 @@
 
             var userReservationsHours = userReservations.Count() * 24;
             if (userReservationsHours >= userHoursLimits.UnavailabilityPaidHoursLimit)
-            {
-                return false;
-            }
-        }
-        else if (model.Type == ReservationType.SchooolReunion)
-        {
-            var userReservations = DbContext.Reservations.Where(r =>
-                r.PlannerUserId == model.PlannerUserId &&
-                r.Type == ReservationType.SchooolReunion &&
-                r.From.Date == model.From.Date).ToList();
-
-            userReservations.Add(model);
-            var userReservationsHours = userReservations.Sum(r => (r.To - r.From).TotalHours);
-
-            if (userReservationsHours >= userHoursLimits.SchooolReunionHoursLimit)
-            {
-                return false;
-            }
-        }
-
-        // check hours in row
-        if (model.Type == ReservationType.UnavailabilityFree)
-        {
-            var userReservations = DbContext.Reservations.Where(r =>
-                r.PlannerUserId == model.PlannerUserId &&
-                r.Type == ReservationType.UnavailabilityFree &&
-                r.From.Date == model.From.Date).ToList();
-        }
-        else if (model.Type == ReservationType.UnavailabilityPaid)
-        {
-            var daysAllowed = userHoursLimits.UnavailabilityPaidHoursInRowLimit / 24.0 - 1;
-
-            var userReservations = DbContext.Reservations.Where(r =>
-                r.PlannerUserId == model.PlannerUser.Id &&
-                r.Type == ReservationType.UnavailabilityPaid).ToList();
-
-            // If user reservations contains day with event with the same day in model
-            if (userReservations.Any(r => r.From.Date == model.From.Date))
-            {
-                var userReservationsHours = userReservations.Count() * 24;
-                if (userReservationsHours >= userHoursLimits.UnavailabilityPaidHoursInRowLimit)
-                {
-                    return false;
-                }
-            }
-
-            // Algorithm to check adjacent days with reservations
-            int aheadCounter = 0;
-            int behindCounter = 0;
-            bool isNextAhead = true;
-            bool isNextBehind = true;
-
-            for (int i = 1; i < (int)(daysAllowed + 1); i++)
-            {
-                if (isNextAhead)
-                {
-                    var reservationAhead = userReservations.FirstOrDefault(r => r.From.Date == model.From.Date.AddDays(i));
-
-                    if (reservationAhead != null)
-                    {
-                        aheadCounter++;
-                    }
-                    else
-                    {
-                        isNextAhead = false;
-                    }
-                }
-
-                var reservationBehind = userReservations.FirstOrDefault(r => r.From.Date == model.From.Date.AddDays(-i));
-
-                if (isNextBehind)
-                {
-                    if (reservationBehind != null)
-                    {
-                        behindCounter++;
-                    }
-                    else
-                    {
-                        isNextBehind = false;
-                    }
-                }
-            }
-
-            if (aheadCounter + behindCounter >= daysAllowed)
             {
                 return false;
             }
@@ -327,21 +255,9 @@
 
     private bool ValidateFromAndToDateIsOnlyInWeekend()
     {
-        if ((reservation.To - reservation.From).Days > 3)
-        {
-            return false;
-        }
-
         if (!(reservation.From.DayOfWeek == DayOfWeek.Friday ||
             reservation.From.DayOfWeek == DayOfWeek.Saturday ||
             reservation.From.DayOfWeek == DayOfWeek.Sunday))
-        {
-            return false;
-        }
-
-        if (!(reservation.To.DayOfWeek == DayOfWeek.Friday ||
-            reservation.To.DayOfWeek == DayOfWeek.Saturday ||
-            reservation.To.DayOfWeek == DayOfWeek.Sunday))
         {
             return false;
         }
@@ -427,38 +343,34 @@
         else if (reservation.Type == ReservationType.SchooolReunion)
         {
             <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Wrap="FlexWrap.Wrap">
-                <RadzenLabel Text="Od"
+                <RadzenLabel Text="Data"
                              Style="width: 6rem;" />
                 <RadzenDatePicker @bind-Value="@reservation.From"
                                   Name="From"
                                   ShowTime="true"
+                                  DateFormat="yyyy/MM/dd"
                                   Style="width: 15rem;" />
                 <RadzenRequiredValidator Component="From"
                                          Text="Data od jest wymagana" />
                 <RadzenCustomValidator Component="From"
                                        Validator="@ValidateFromDateAndPlanningSessionFromDateOrder"
                                        Text="Data 'Od' musi być późniejsza niż data rozpoczęcia sesji planowania" />
+                <RadzenCustomValidator Component="From"
+                                       Validator="@ValidateFromAndToDateIsOnlyInWeekend"
+                                       Text="Zjazd może odbywać się tylko w weekend (piątek, sobota, niedziela)" />
             </RadzenStack>
 
+
             <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Wrap="FlexWrap.Wrap">
-                <RadzenLabel Text="Do"
+                <RadzenLabel Text="Zmiana: "
                              Style="width: 6rem;" />
-                <RadzenDatePicker @bind-Value="@reservation.To"
-                                  Name="To"
-                                  ShowTime="true"
-                                  Style="width: 15rem;"
-                                  />
-                <RadzenRequiredValidator Component="To"
-                                         Text="Data do jest wymagana" />
-                <RadzenCustomValidator Component="To"
-                                       Validator="@ValidateFromAndToDateRangeOrder"
-                                       Text="Data 'Do' musi być później niż data 'Od'" />
-                <RadzenCustomValidator Component="To"
-                                       Validator="@ValidateToDateAndPlanningSessionToDateOrder"
-                                       Text="Data 'Do' musi być wcześniejsza niż data zakończenia sesji planowania" />
-                <RadzenCustomValidator Component="To"
-                                       Validator="@ValidateFromAndToDateIsOnlyInWeekend"
-                                       Text="Zjazd może odbywać się tylko w weekend (piątek, sobota, niedziela)"/>
+
+                <RadzenRadioButtonList @bind-Value=@shiftOption TValue="int" Orientation="Orientation.Vertical" Style="width: 15rem;">
+                    <Items>
+                        <RadzenRadioButtonListItem Text="dzienna" Value="1" />
+                        <RadzenRadioButtonListItem Text="nocna" Value="2" />
+                    </Items>
+                </RadzenRadioButtonList>
             </RadzenStack>
         }
 

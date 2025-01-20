@@ -1,6 +1,7 @@
 ﻿@using Grafik.Data
 @using System.Security.Claims
 @using Grafik.Services
+@using Microsoft.EntityFrameworkCore
 
 @inject DialogService DialogService
 @inject ApplicationDbContext DbContext
@@ -178,30 +179,28 @@
         // check total sums of hours in planning session
         if (model.Type == ReservationType.UnavailabilityFree)
         {
-            var userReservations = DbContext.Reservations.Where(r =>
-                r.PlannerUserId == model.PlannerUserId &&
-                r.Type == ReservationType.UnavailabilityFree &&
-                r.From.Date == model.From.Date).ToList();
+            var userReservations = DbContext.Reservations.Include("PlannerUser").Where(r =>
+                r.PlannerUserId == model.PlannerUser.Id &&
+                r.Type == ReservationType.UnavailabilityFree).ToList();
 
             userReservations.Add(model);
             var userReservationsHours = userReservations.Count() * 12;
 
-            if (userReservationsHours >= userHoursLimits.UnavailabilityFreeHoursLimit)
+            if (userReservationsHours > userHoursLimits.UnavailabilityFreeHoursLimit)
             {
                 return false;
             }
         }
         else if (model.Type == ReservationType.UnavailabilityPaid)
         {
-            var userReservations = DbContext.Reservations.Where(r =>
-                r.PlannerUserId == model.PlannerUserId &&
-                r.Type == ReservationType.UnavailabilityPaid &&
-                r.From.Date == model.From.Date).ToList();
+            var userReservations = DbContext.Reservations.Include("PlannerUser").Where(r =>
+                r.PlannerUserId == model.PlannerUser.Id &&
+                r.Type == ReservationType.UnavailabilityPaid).ToList();
 
             userReservations.Add(model);
 
             var userReservationsHours = userReservations.Count() * 24;
-            if (userReservationsHours >= userHoursLimits.UnavailabilityPaidHoursLimit)
+            if (userReservationsHours > userHoursLimits.UnavailabilityPaidHoursLimit)
             {
                 return false;
             }

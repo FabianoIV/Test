@@ -678,16 +678,24 @@
                         </RadzenDataGridColumn>
                         <RadzenDataGridColumn Property="@nameof(UserHourLimit.UnavailabilityPaidHoursLimit)"
                                               Filterable="true"
-                                              Title="Limit godzin niedostępności płatnych w sesji planingowej"
+                                              Title="Limit dni niedostępności płatnych w sesji planingowej"
                                               Frozen="true"
                                               Width="80px"
-                                              TextAlign="TextAlign.Left" />
+                                              TextAlign="TextAlign.Left" >
+                                          <Template Context="userHourLimit">
+                                @(userHourLimit.UnavailabilityPaidHoursLimit / 24) Dni (Godziny: @userHourLimit.UnavailabilityPaidHoursLimit)
+                                            </Template>
+                                          </RadzenDataGridColumn>
                         <RadzenDataGridColumn Property="@nameof(UserHourLimit.UnavailabilityFreeHoursLimit)"
                                               Filterable="true"
-                                              Title="Limit godzin niedostępności bezpłatnych w sesji planingowej"
+                                              Title="Limit zmian - niedostępności bezpłatnych w sesji planingowej"
                                               Frozen="true"
                                               Width="80px"
-                                              TextAlign="TextAlign.Left" />
+                                              TextAlign="TextAlign.Left">
+                                        <Template Context="userHourLimit">
+                                @(userHourLimit.UnavailabilityFreeHoursLimit / 12) Zmiany (Godziny: @userHourLimit.UnavailabilityFreeHoursLimit)
+                                        </Template>
+                                          </RadzenDataGridColumn>
                         <RadzenDataGridColumn Context="userHourLimit"
                                               Filterable="false"
                                               Sortable="false"
